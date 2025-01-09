@@ -1,0 +1,8 @@
+.vscode
+.git
+
+*_test.go
+*.json
+*.txt
+
+session.db
