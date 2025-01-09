@@ -11,13 +11,19 @@ import (
 	"github.com/mdp/qrterminal"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
 var client *whatsmeow.Client
 
 func eventHandler(evt interface{}) {
-	Handle(client, evt)
+	switch v := evt.(type) {
+	case *events.Message:
+		Handle(client, v)
+	case *events.Connected:
+		fmt.Println("BOT Connected!")
+	}
 }
 
 func Start() error {
