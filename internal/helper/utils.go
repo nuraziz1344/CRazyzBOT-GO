@@ -3,7 +3,7 @@ package helper
 import (
 	"bytes"
 	"encoding/json"
-	"log"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -24,10 +24,10 @@ func MarshalIndent(v any) (string, error) {
 func PrettyPrint(t interface{}) {
 	o, err := MarshalIndent(t)
 	if err != nil {
-		log.Println("Error:", err.Error())
+		fmt.Println("Error:", err.Error())
 		return
 	}
-	log.Println(string(o))
+	fmt.Println(string(o))
 }
 
 func FindBetween(s string, start string, end string) string {
@@ -53,4 +53,8 @@ func FindBetween(s string, start string, end string) string {
 func IsExist(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func StringPtr(str string) *string {
+	return &str
 }
