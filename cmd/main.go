@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	_ "github.com/joho/godotenv/autoload"
 	"github.com/nuraziz1344/CRazyzBOT-GO/internal/bot"
 )
 

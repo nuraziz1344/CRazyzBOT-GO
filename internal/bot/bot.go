@@ -2,7 +2,7 @@ package bot
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -22,16 +22,20 @@ func eventHandler(evt interface{}) {
 	case *events.Message:
 		Handle(client, v)
 	case *events.Connected:
-		fmt.Println("BOT Connected!")
+		log.Println("BOT Connected!")
 	}
 }
 
 func Start() error {
-	fmt.Println("Starting BOT...")
+	log.Println("Starting BOT...")
 	dbLog := waLog.Stdout("Database", "Warn", true)
 
 	// Create a new SQLite store
-	db, err := sqlstore.New("sqlite3", "file:session.db?_foreign_keys=on", dbLog)
+	sessionFile := os.Getenv("SESSION_FILE")
+	if sessionFile == "" {
+		sessionFile = "data/session.db"
+	}
+	db, err := sqlstore.New("sqlite3", "file:"+sessionFile+"?_foreign_keys=on", dbLog)
 	if err != nil {
 		return err
 	}
@@ -57,9 +61,9 @@ func Start() error {
 				// e.g. qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
 				// or just manually `echo 2@... | qrencode -t ansiutf8` in a terminal
 				qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
-				fmt.Println("QR code:", evt.Code)
+				log.Println("QR code:", evt.Code)
 			} else {
-				fmt.Println("Login event:", evt.Event)
+				log.Println("Login event:", evt.Event)
 			}
 		}
 	} else {

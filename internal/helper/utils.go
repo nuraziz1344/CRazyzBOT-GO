@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
+	"time"
 )
 
 func MarshalIndent(v any) (string, error) {
@@ -24,10 +26,10 @@ func MarshalIndent(v any) (string, error) {
 func PrettyPrint(t interface{}) {
 	o, err := MarshalIndent(t)
 	if err != nil {
-		fmt.Println("Error:", err.Error())
+		log.Println("PrettyPrint Error:", err.Error())
 		return
 	}
-	fmt.Println(string(o))
+	log.Println(strings.Trim(o, "\n"))
 }
 
 func FindBetween(s string, start string, end string) string {
@@ -57,4 +59,9 @@ func IsExist(path string) bool {
 
 func StringPtr(str string) *string {
 	return &str
+}
+
+func Temp(ext string) string {
+	timestamp := time.Now().UnixNano()
+	return "data/tmp/" + fmt.Sprint(timestamp) + ext
 }
