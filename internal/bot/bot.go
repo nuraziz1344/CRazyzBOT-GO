@@ -27,8 +27,13 @@ func eventHandler(evt interface{}) {
 }
 
 func Start() error {
+	logLevel := os.Getenv("LOG_LEVEL")
+	if logLevel == "" {
+		logLevel = "warn"
+	}
+
 	log.Println("Starting BOT...")
-	dbLog := waLog.Stdout("Database", "Warn", true)
+	dbLog := waLog.Stdout("Database", logLevel, true)
 
 	// Create a new SQLite store
 	sessionFile := os.Getenv("SESSION_FILE")
@@ -44,7 +49,7 @@ func Start() error {
 		return err
 	}
 
-	clientLog := waLog.Stdout("Client", "Warn", true)
+	clientLog := waLog.Stdout("Client", logLevel, true)
 	client = whatsmeow.NewClient(deviceStore, clientLog)
 	client.AddEventHandler(eventHandler)
 
