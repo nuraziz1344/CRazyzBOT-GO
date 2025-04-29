@@ -5,4 +5,5 @@
 *.json
 *.txt
 
-session.db
+data/session.db
+.env
