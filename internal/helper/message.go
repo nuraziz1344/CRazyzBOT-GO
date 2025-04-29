@@ -32,7 +32,6 @@ func SendTextMessage(c *whatsmeow.Client, JID types.JID, text string, quoted *dt
 				ContextInfo: generateReplyContextInfo(quoted),
 			},
 		}
-		PrettyPrint(m)
 		_, err = c.SendMessage(context.Background(), JID, m)
 	} else {
 		_, err = c.SendMessage(context.Background(), JID, &waE2E.Message{Conversation: &text})

@@ -94,7 +94,7 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 		MediaType: dto.MediaType(mediaType),
 	}
 
-	helper.PrettyPrint(parsedMsg)
+	// helper.PrettyPrint(parsedMsg)
 	commands.HandleCommand(c, &parsedMsg)
 	c.MarkRead([]string{msg.Info.ID}, time.Now(), msg.Info.Chat, msg.Info.Sender)
 }
