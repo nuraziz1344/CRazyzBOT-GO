@@ -17,7 +17,7 @@ import (
 
 var client *whatsmeow.Client
 
-func eventHandler(evt interface{}) {
+func eventHandler(evt any) {
 	switch v := evt.(type) {
 	case *events.Message:
 		Handle(client, v)
