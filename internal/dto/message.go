@@ -27,7 +27,7 @@ type ParsedMsg struct {
 	Participant   string
 
 	IsGroup   bool
-	GroupName string
+	GroupInfo *types.GroupInfo
 
 	PushName string
 	Phone    string
@@ -35,9 +35,9 @@ type ParsedMsg struct {
 	Timestamp time.Time
 	Body      string
 
-	Media     whatsmeow.DownloadableMessage
-	MediaType MediaType
-	Filename  string
+	Media         *whatsmeow.DownloadableMessage
+	MediaType     MediaType
+	MediaFilename string
 }
 
 type ParseQuotedMessage struct {

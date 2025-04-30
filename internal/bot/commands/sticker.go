@@ -18,12 +18,12 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	var isAnimated bool
 
 	if msg.MediaType == dto.Image || msg.MediaType == dto.Video || msg.MediaType == dto.Document {
-		media = &msg.Media
+		media = msg.Media
 		mediaType = msg.MediaType
 	} else if msg.QuotedMessage != nil {
 		quotedMsg := helper.ParseQuotedMessage(msg.QuotedMessage)
 		if quotedMsg.MediaType == dto.Image || quotedMsg.MediaType == dto.Video || quotedMsg.MediaType == dto.Document {
-			media = &quotedMsg.Media
+			media = quotedMsg.Media
 			mediaType = quotedMsg.MediaType
 		}
 	}

@@ -20,6 +20,7 @@ func ParseQuotedMessage(message *waE2E.Message) dto.ParsedMsg {
 	var body string
 	var media whatsmeow.DownloadableMessage
 	var mediaType string
+	var mediaFilename string
 
 	if message.ViewOnceMessage != nil {
 		message = message.ViewOnceMessage.Message
@@ -43,6 +44,10 @@ func ParseQuotedMessage(message *waE2E.Message) dto.ParsedMsg {
 	} else if message.DocumentMessage != nil {
 		mediaType = "document"
 		media = message.DocumentMessage
+		mediaFilename = message.DocumentMessage.GetFileName()
+		if mediaFilename == "" {
+			mediaFilename = message.DocumentMessage.GetTitle()
+		}
 		if message.DocumentMessage.GetTitle() != message.DocumentMessage.GetCaption() {
 			body = message.DocumentMessage.GetCaption()
 		}
@@ -55,8 +60,9 @@ func ParseQuotedMessage(message *waE2E.Message) dto.ParsedMsg {
 	}
 
 	return dto.ParsedMsg{
-		Body:      body,
-		Media:     media,
-		MediaType: dto.MediaType(mediaType),
+		Body:          body,
+		Media:         &media,
+		MediaType:     dto.MediaType(mediaType),
+		MediaFilename: mediaFilename,
 	}
 }

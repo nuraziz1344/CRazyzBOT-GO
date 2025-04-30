@@ -16,6 +16,7 @@ import (
 
 func Handle(c *whatsmeow.Client, msg *events.Message) {
 	log.Println("Received a message!", msg.Message.GetConversation())
+	var err error
 
 	sender := helper.GetSenderNumber(msg.Info.Sender.String())
 	pushname := msg.Info.PushName
@@ -26,16 +27,21 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 		return
 	}
 
-	var groupName string
+	var groupInfo *types.GroupInfo
 	var message *waE2E.Message = msg.Message
 	var quotedMessage *waE2E.Message
 	var body string
 
 	var media whatsmeow.DownloadableMessage
 	var mediaType string
+	var mediaFilename string
 
 	if strings.Contains(msg.Info.Chat.String(), "@g.us") {
-		groupName = GetGroupName(c, msg.Info.Chat)
+		groupInfo, err = c.GetGroupInfo(msg.Info.Chat)
+		if err != nil {
+			log.Println("Error getting group info:", err)
+			return
+		}
 	}
 
 	if message.ViewOnceMessage != nil {
@@ -63,6 +69,10 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 	} else if message.DocumentMessage != nil {
 		mediaType = "document"
 		media = message.DocumentMessage
+		mediaFilename = message.DocumentMessage.GetFileName()
+		if message.DocumentMessage.GetFileName() == "" {
+			mediaFilename = message.DocumentMessage.GetTitle()
+		}
 		if message.DocumentMessage.GetTitle() != message.DocumentMessage.GetCaption() {
 			body = message.DocumentMessage.GetCaption()
 		}
@@ -71,7 +81,7 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 		if *message.StickerMessage.IsAnimated {
 			mediaType = "animated_sticker"
 		}
-		media = whatsmeow.DownloadableMessage(message.StickerMessage)
+		media = message.StickerMessage
 	}
 
 	parsedMsg := dto.ParsedMsg{
@@ -83,15 +93,16 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 		Participant:   sender + "@s.whatsapp.net",
 
 		IsGroup:   strings.Contains(msg.Info.Chat.String(), "@g.us"),
-		GroupName: groupName,
+		GroupInfo: groupInfo,
 
 		PushName: pushname,
 		Phone:    sender,
 
-		Timestamp: timestamp,
-		Body:      body,
-		Media:     media,
-		MediaType: dto.MediaType(mediaType),
+		Timestamp:     timestamp,
+		Body:          body,
+		Media:         &media,
+		MediaType:     dto.MediaType(mediaType),
+		MediaFilename: mediaFilename,
 	}
 
 	// helper.PrettyPrint(parsedMsg)
