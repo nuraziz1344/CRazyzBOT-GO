@@ -16,6 +16,11 @@ func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 		prefix = "/"
 	}
 
+	if (msg.Body == "@all" || msg.Body == "@everyone") && msg.GroupInfo != nil {
+		HandleTagAll(c, msg, msg.Body)
+		return
+	}
+
 	if msg.Body == "" || msg.Body[0] != prefix[0] {
 		return
 	}
@@ -33,16 +38,22 @@ func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	// Handle the command based on its type
 	switch command {
 	case "help":
-		helper.SendTextMessage(c, msg.From, "Available commands: /help, /ping", nil)
+		helper.SendTextMessage(c, msg.From, "Available commands: /help, /ping, /tagall", nil)
 	case "ping":
 		helper.SendTextMessage(c, msg.From, "Pong!", &dto.Quoted{
 			QuotedMessage: msg.QuotedMessage,
 			StanzaID:      &msg.StanzaID,
 			Participant:   &msg.Participant,
 		})
+	case "tagall", "all":
+		HandleTagAll(c, msg, args)
 	case "s", "sticker":
 		HandleSticker(c, msg)
 	default:
-		helper.SendTextMessage(c, msg.From, "Unknown command: "+command, nil)
+		helper.SendTextMessage(c, msg.From, "Unknown command: "+command, &dto.Quoted{
+			QuotedMessage: msg.QuotedMessage,
+			StanzaID:      &msg.StanzaID,
+			Participant:   &msg.Participant,
+		})
 	}
 }

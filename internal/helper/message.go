@@ -10,7 +10,7 @@ import (
 	"go.mau.fi/whatsmeow/types"
 )
 
-func generateReplyContextInfo(quoted *dto.Quoted) *waE2E.ContextInfo {
+func GenerateReplyContextInfo(quoted *dto.Quoted) *waE2E.ContextInfo {
 	if quoted.QuotedMessage == nil {
 		return nil
 	}
@@ -29,7 +29,7 @@ func SendTextMessage(c *whatsmeow.Client, JID types.JID, text string, quoted *dt
 		m := &waE2E.Message{
 			ExtendedTextMessage: &waE2E.ExtendedTextMessage{
 				Text:        &text,
-				ContextInfo: generateReplyContextInfo(quoted),
+				ContextInfo: GenerateReplyContextInfo(quoted),
 			},
 		}
 		_, err = c.SendMessage(context.Background(), JID, m)
@@ -62,7 +62,7 @@ func SendStickerMessage(c *whatsmeow.Client, from types.JID, media *[]byte, isAn
 	}
 
 	if quoted != nil {
-		stickerMessage.ContextInfo = generateReplyContextInfo(quoted)
+		stickerMessage.ContextInfo = GenerateReplyContextInfo(quoted)
 	}
 	_, err = c.SendMessage(context.Background(), from, &waE2E.Message{StickerMessage: stickerMessage})
 

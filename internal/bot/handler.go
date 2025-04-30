@@ -15,7 +15,7 @@ import (
 )
 
 func Handle(c *whatsmeow.Client, msg *events.Message) {
-	log.Println("Received a message!", msg.Message.GetConversation())
+	// log.Println("Received a message!", msg.Message.GetConversation())
 	var err error
 
 	sender := helper.GetSenderNumber(msg.Info.Sender.String())
@@ -23,14 +23,17 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 	timestamp := msg.Info.Timestamp
 
 	// Ignore messages older than 60 seconds
-	if time.Now().Sub(timestamp).Seconds() > 60 {
+	if time.Since(timestamp).Seconds() > 60 {
 		return
 	}
 
 	var groupInfo *types.GroupInfo
 	var message *waE2E.Message = msg.Message
-	var quotedMessage *waE2E.Message
 	var body string
+
+	var quotedMessage *waE2E.Message
+	var quotedStanzaID *types.MessageID
+	var quotedParticipant *string
 
 	var media whatsmeow.DownloadableMessage
 	var mediaType string
@@ -56,6 +59,8 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 		body = message.ExtendedTextMessage.GetText()
 		if message.ExtendedTextMessage.ContextInfo.QuotedMessage != nil {
 			quotedMessage = message.ExtendedTextMessage.ContextInfo.QuotedMessage
+			quotedStanzaID = message.ExtendedTextMessage.ContextInfo.StanzaID
+			quotedParticipant = message.ExtendedTextMessage.ContextInfo.Participant
 		}
 	} else if message.ImageMessage != nil {
 		mediaType = "image"
@@ -85,12 +90,16 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 	}
 
 	parsedMsg := dto.ParsedMsg{
-		StanzaID:      msg.Info.ID,
-		Message:       message,
-		QuotedMessage: quotedMessage,
-		From:          msg.Info.Chat,
-		Sender:        msg.Info.Sender,
-		Participant:   sender + "@s.whatsapp.net",
+		StanzaID: msg.Info.ID,
+		Message:  message,
+
+		QuotedMessage:     quotedMessage,
+		QuotedStanzaID:    quotedStanzaID,
+		QuotedParticipant: quotedParticipant,
+
+		From:        msg.Info.Chat,
+		Sender:      msg.Info.Sender,
+		Participant: sender + "@s.whatsapp.net",
 
 		IsGroup:   strings.Contains(msg.Info.Chat.String(), "@g.us"),
 		GroupInfo: groupInfo,
@@ -99,7 +108,7 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 		Phone:    sender,
 
 		Timestamp:     timestamp,
-		Body:          body,
+		Body:          helper.TrimString(body),
 		Media:         &media,
 		MediaType:     dto.MediaType(mediaType),
 		MediaFilename: mediaFilename,

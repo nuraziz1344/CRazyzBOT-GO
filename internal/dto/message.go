@@ -19,12 +19,16 @@ const (
 )
 
 type ParsedMsg struct {
-	StanzaID      types.MessageID
-	Message       *waE2E.Message
-	QuotedMessage *waE2E.Message
-	From          types.JID
-	Sender        types.JID
-	Participant   string
+	StanzaID types.MessageID
+	Message  *waE2E.Message
+
+	QuotedMessage     *waE2E.Message
+	QuotedStanzaID    *types.MessageID
+	QuotedParticipant *string
+
+	From        types.JID
+	Sender      types.JID
+	Participant string
 
 	IsGroup   bool
 	GroupInfo *types.GroupInfo
