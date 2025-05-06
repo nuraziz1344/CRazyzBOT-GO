@@ -17,12 +17,12 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	var mediaType dto.MediaType
 	var isAnimated bool
 
-	if msg.MediaType == dto.Image || msg.MediaType == dto.Video || msg.MediaType == dto.Document {
+	if msg.MediaType == dto.MediaImage || msg.MediaType == dto.MediaVideo || msg.MediaType == dto.MediaDocument {
 		media = msg.Media
 		mediaType = msg.MediaType
 	} else if msg.QuotedMessage != nil {
 		quotedMsg := helper.ParseQuotedMessage(msg.QuotedMessage)
-		if quotedMsg.MediaType == dto.Image || quotedMsg.MediaType == dto.Video || quotedMsg.MediaType == dto.Document {
+		if quotedMsg.MediaType == dto.MediaImage || quotedMsg.MediaType == dto.MediaVideo || quotedMsg.MediaType == dto.MediaDocument {
 			media = quotedMsg.Media
 			mediaType = quotedMsg.MediaType
 		}
@@ -42,9 +42,9 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 		return
 	}
 
-	if mediaType == dto.Video {
+	if mediaType == dto.MediaVideo {
 		isAnimated = true
-	} else if mediaType == dto.Document {
+	} else if mediaType == dto.MediaDocument {
 		mimeType := http.DetectContentType(res)
 		isAnimated = strings.HasPrefix(mimeType, "video/")
 	}

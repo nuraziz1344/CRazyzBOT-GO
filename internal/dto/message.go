@@ -11,11 +11,11 @@ import (
 type MediaType string
 
 const (
-	Image           MediaType = "image"
-	Video           MediaType = "video"
-	Document        MediaType = "document"
-	Sticker         MediaType = "sticker"
-	AnimatedSticker MediaType = "animated_sticker"
+	MediaImage           MediaType = "image"
+	MediaVideo           MediaType = "video"
+	MediaDocument        MediaType = "document"
+	MediaSticker         MediaType = "sticker"
+	MediaAnimatedSticker MediaType = "animated_sticker"
 )
 
 type ParsedMsg struct {
