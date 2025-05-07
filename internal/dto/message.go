@@ -44,12 +44,6 @@ type ParsedMsg struct {
 	MediaFilename string
 }
 
-type ParseQuotedMessage struct {
-	Body      string
-	Media     whatsmeow.DownloadableMessage
-	MediaType MediaType
-}
-
 type Quoted struct {
 	QuotedMessage *waE2E.Message
 	StanzaID      *types.MessageID
