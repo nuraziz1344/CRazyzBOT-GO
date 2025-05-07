@@ -21,6 +21,11 @@ func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 		return
 	}
 
+	if !msg.IsGroup && msg.QuotedMessage == nil && (msg.MediaType == dto.MediaSticker || msg.MediaType == dto.MediaAnimatedSticker) {
+		HandleToImg(c, msg)
+		return
+	}
+
 	if msg.Body == "" || msg.Body[0] != prefix[0] {
 		return
 	}
@@ -49,6 +54,8 @@ func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 		HandleTagAll(c, msg, args)
 	case "s", "sticker":
 		HandleSticker(c, msg)
+	case "toimg":
+		HandleToImg(c, msg)
 	default:
 		helper.SendTextMessage(c, msg.From, "Unknown command: "+command, &dto.Quoted{
 			QuotedMessage: msg.QuotedMessage,
