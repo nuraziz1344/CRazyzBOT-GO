@@ -57,10 +57,6 @@ func IsExist(path string) bool {
 	return err == nil
 }
 
-func StringPtr(str string) *string {
-	return &str
-}
-
 func Temp(ext string) string {
 	timestamp := time.Now().UnixNano()
 	return "data/tmp/" + fmt.Sprint(timestamp) + ext

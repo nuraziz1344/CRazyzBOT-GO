@@ -56,7 +56,7 @@ func SendStickerMessage(c *whatsmeow.Client, from types.JID, media *[]byte, isAn
 		FileSHA256:    res.FileSHA256,
 		FileEncSHA256: res.FileEncSHA256,
 		MediaKey:      res.MediaKey,
-		Mimetype:      StringPtr("image/webp"),
+		Mimetype:      proto.String("image/webp"),
 		DirectPath:    &res.DirectPath,
 		FileLength:    &res.FileLength,
 		IsAnimated:    &isAnimated,
@@ -87,7 +87,7 @@ func SendImageMessage(c *whatsmeow.Client, from types.JID, media *[]byte, quoted
 		FileSHA256:    res.FileSHA256,
 		FileEncSHA256: res.FileEncSHA256,
 		MediaKey:      res.MediaKey,
-		Mimetype:      StringPtr("image/png"),
+		Mimetype:      proto.String("image/png"),
 		DirectPath:    &res.DirectPath,
 		FileLength:    &res.FileLength,
 	}
