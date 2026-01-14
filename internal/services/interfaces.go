@@ -29,6 +29,7 @@ type MinecraftStatus struct {
 	Description   string
 	PlayersOnline int
 	PlayersMax    int
+	Players       []string
 	Version       string
 	Latency       int
 }

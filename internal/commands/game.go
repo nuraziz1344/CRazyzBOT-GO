@@ -86,7 +86,10 @@ func (h *GameHandler) sendMinecraftStatus(c *whatsmeow.Client, jid types.JID, na
 		res += fmt.Sprintf("Latency: %dms\n", status.Latency)
 	}
 	if status.Description != "" {
-		res += fmt.Sprintf("MOTD: %s", status.Description)
+		res += fmt.Sprintf("MOTD: %s\n", status.Description)
+	}
+	if len(status.Players) > 0 {
+		res += fmt.Sprintf("Online Players:\n- %s\n", strings.Join(status.Players, "\n- "))
 	}
 
 	helper.SendTextMessage(c, jid, res, nil)

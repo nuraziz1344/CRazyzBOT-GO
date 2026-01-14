@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -66,15 +67,25 @@ func (s *Service) GetStatus(ctx context.Context, server string) (*services.Minec
 	}, nil
 }
 
-// GetServerTapStatus fetches status from a custom API endpoint
-func (s *Service) GetServerTapStatus(ctx context.Context) (*services.MinecraftStatus, error) {
-	if s.apiURL == "" {
-		return nil, fmt.Errorf("MC_API_URL is not configured")
+type serverTapServerResp struct {
+	Motd       string  `json:"motd"`
+	Version    string  `json:"version"`
+	MaxPlayers float64 `json:"maxPlayers"` // Some APIs return numbers as float
+}
+
+type serverTapPlayer struct {
+	DisplayName string `json:"displayName"`
+}
+
+func (s *Service) doRequest(ctx context.Context, path string, target interface{}) error {
+	fullURL, err := url.JoinPath(s.apiURL, path)
+	if err != nil {
+		return err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", s.apiURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if s.apiKey != "" {
@@ -84,35 +95,45 @@ func (s *Service) GetServerTapStatus(ctx context.Context) (*services.MinecraftSt
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API returned status: %d", resp.StatusCode)
+		return fmt.Errorf("API %s returned status: %d", path, resp.StatusCode)
 	}
 
-	// Parsing the specific response from mc-api.crazyz.my.id
-	var apiResp struct {
-		Online  bool   `json:"online"`
-		Version string `json:"version"`
-		Players struct {
-			Now int `json:"now"`
-			Max int `json:"max"`
-		} `json:"players"`
-		Motd string `json:"motd"`
+	return json.NewDecoder(resp.Body).Decode(target)
+}
+
+// GetServerTapStatus fetches status from a custom API endpoint
+func (s *Service) GetServerTapStatus(ctx context.Context) (*services.MinecraftStatus, error) {
+	if s.apiURL == "" {
+		return nil, fmt.Errorf("MC_API_URL is not configured")
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
-		return nil, err
+	var serverResp serverTapServerResp
+	if err := s.doRequest(ctx, "/v1/server", &serverResp); err != nil {
+		return nil, fmt.Errorf("failed to get server info: %w", err)
+	}
+
+	var playersResp []serverTapPlayer
+	if err := s.doRequest(ctx, "/v1/players", &playersResp); err != nil {
+		return nil, fmt.Errorf("failed to get players info: %w", err)
+	}
+
+	var playerNames []string
+	for _, p := range playersResp {
+		playerNames = append(playerNames, p.DisplayName)
 	}
 
 	return &services.MinecraftStatus{
 		Online:        true,
-		Description:   apiResp.Motd,
-		PlayersOnline: apiResp.Players.Now,
-		PlayersMax:    apiResp.Players.Max,
-		Version:       apiResp.Version,
+		Description:   serverResp.Motd,
+		PlayersOnline: len(playersResp),
+		PlayersMax:    int(serverResp.MaxPlayers),
+		Players:       playerNames,
+		Version:       serverResp.Version,
 		Latency:       0,
 	}, nil
 }
