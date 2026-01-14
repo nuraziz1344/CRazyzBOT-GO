@@ -1,18 +1,20 @@
 package commands
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/dto"
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/helper"
+	"bot/internal/dto"
+	"bot/internal/helper"
+
 	"go.mau.fi/whatsmeow"
 )
 
-func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
+func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
 	var media *whatsmeow.DownloadableMessage
 	var mediaType dto.MediaType
 	var isAnimated bool
@@ -29,14 +31,12 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	}
 
 	if media == nil {
+		// Only log, don't spam if accidentally triggered
 		log.Println("No media found for sticker generation")
 		return
 	}
 
-	var res []byte
-	var err error
-
-	res, err = c.Download(*media)
+	res, err := c.Download(context.Background(), *media)
 	if err != nil {
 		log.Println("Error downloading media:", err)
 		return
@@ -49,20 +49,20 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 		isAnimated = strings.HasPrefix(mimeType, "video/")
 	}
 
-	res, err = generateSticker(res, isAnimated)
+	stickerBytes, err := generateSticker(res, isAnimated)
 	if err != nil {
 		log.Println("Error generating sticker:", err)
+		helper.SendTextMessage(c, msg.From, "Failed to generate sticker", nil)
 		return
 	}
 
-	err = helper.SendStickerMessage(c, msg.From, &res, isAnimated, &dto.Quoted{
-		QuotedMessage: msg.QuotedMessage,
+	err = helper.SendStickerMessage(c, msg.From, &stickerBytes, isAnimated, &dto.Quoted{
+		QuotedMessage: msg.Message,
 		StanzaID:      &msg.StanzaID,
 		Participant:   &msg.Participant,
 	})
 	if err != nil {
 		log.Println("Error sending sticker message:", err)
-		return
 	}
 }
 

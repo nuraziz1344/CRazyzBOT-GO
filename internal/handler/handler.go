@@ -1,21 +1,46 @@
-package bot
+package handler
 
 import (
+	"context"
 	"log"
 	"strings"
 	"time"
 
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/bot/commands"
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/dto"
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/helper"
+	"bot/internal/commands"
+	"bot/internal/config"
+	"bot/internal/dto"
+	"bot/internal/helper"
+
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 )
 
-func Handle(c *whatsmeow.Client, msg *events.Message) {
-	// log.Println("Received a message!", msg.Message.GetConversation())
+type BotHandler struct {
+	client   *whatsmeow.Client
+	config   *config.Config
+	registry *commands.Registry
+}
+
+func NewBotHandler(c *whatsmeow.Client, cfg *config.Config, reg *commands.Registry) *BotHandler {
+	return &BotHandler{
+		client:   c,
+		config:   cfg,
+		registry: reg,
+	}
+}
+
+func (h *BotHandler) EventHandler(evt any) {
+	switch v := evt.(type) {
+	case *events.Message:
+		h.handleMessage(v)
+	case *events.Connected:
+		log.Println("BOT Connected!")
+	}
+}
+
+func (h *BotHandler) handleMessage(msg *events.Message) {
 	var err error
 
 	sender := helper.GetSenderNumber(msg.Info.Sender.String())
@@ -40,7 +65,7 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 	var mediaFilename string
 
 	if strings.Contains(msg.Info.Chat.String(), "@g.us") {
-		groupInfo, err = c.GetGroupInfo(msg.Info.Chat)
+		groupInfo, err = h.client.GetGroupInfo(context.Background(), msg.Info.Chat)
 		if err != nil {
 			log.Println("Error getting group info:", err)
 			return
@@ -114,16 +139,6 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 		MediaFilename: mediaFilename,
 	}
 
-	// helper.PrettyPrint(parsedMsg)
-	commands.HandleCommand(c, &parsedMsg)
-	c.MarkRead([]string{msg.Info.ID}, time.Now(), msg.Info.Chat, msg.Info.Sender)
-}
-
-func GetGroupName(c *whatsmeow.Client, JID types.JID) string {
-	groups, err := c.GetGroupInfo(JID)
-	if err != nil {
-		log.Println("Error getting group name:", err)
-		return ""
-	}
-	return groups.Name
+	h.registry.Handle(h.client, &parsedMsg)
+	h.client.MarkRead(context.Background(), []string{msg.Info.ID}, time.Now(), msg.Info.Chat, msg.Info.Sender)
 }

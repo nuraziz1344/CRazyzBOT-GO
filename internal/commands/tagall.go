@@ -4,20 +4,27 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/dto"
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/helper"
+	"bot/internal/dto"
+	"bot/internal/helper"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 )
 
 func HandleTagAll(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
+	if !msg.IsGroup {
+		helper.SendTextMessage(c, msg.From, "This command can only be used in groups.", nil)
+		return
+	}
+
 	var mentionedJIDs []string
-	for _, participant := range msg.GroupInfo.Participants {
-		mentionedJIDs = append(mentionedJIDs, participant.JID.String())
+	if msg.GroupInfo != nil {
+		for _, participant := range msg.GroupInfo.Participants {
+			mentionedJIDs = append(mentionedJIDs, participant.JID.String())
+		}
 	}
 
 	var message string
-	if args == "@all" || args == "@everyone" || args != "" {
+	if args == "@all" || args == "@everyone" || (args != "" && args != "tagall") {
 		message = args
 	} else {
 		message = "Tagging all members in the group"
