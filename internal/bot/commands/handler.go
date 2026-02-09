@@ -56,6 +56,12 @@ func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 		HandleSticker(c, msg)
 	case "toimg":
 		HandleToImg(c, msg)
+	case "jid":
+		helper.SendTextMessage(c, msg.From, "Chat JID: "+msg.From.String()+"\nSender JID: "+msg.Sender.String(), &dto.Quoted{
+			QuotedMessage: msg.QuotedMessage,
+			StanzaID:      &msg.StanzaID,
+			Participant:   &msg.Participant,
+		})
 	default:
 		helper.SendTextMessage(c, msg.From, "Unknown command: "+command, &dto.Quoted{
 			QuotedMessage: msg.QuotedMessage,
@@ -64,3 +70,4 @@ func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 		})
 	}
 }
+

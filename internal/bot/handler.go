@@ -84,7 +84,7 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 		}
 	} else if message.StickerMessage != nil {
 		mediaType = "sticker"
-		if *message.StickerMessage.IsAnimated {
+		if message.StickerMessage.IsAnimated != nil && *message.StickerMessage.IsAnimated {
 			mediaType = "animated_sticker"
 		}
 		media = message.StickerMessage
