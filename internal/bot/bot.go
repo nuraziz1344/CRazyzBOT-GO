@@ -40,11 +40,11 @@ func Start() error {
 	if sessionFile == "" {
 		sessionFile = "data/session.db"
 	}
-	db, err := sqlstore.New("sqlite3", "file:"+sessionFile+"?_foreign_keys=on", dbLog)
+	db, err := sqlstore.New(context.Background(), "sqlite3", "file:"+sessionFile+"?_foreign_keys=on", dbLog)
 	if err != nil {
 		return err
 	}
-	deviceStore, err := db.GetFirstDevice()
+	deviceStore, err := db.GetFirstDevice(context.Background())
 	if err != nil {
 		return err
 	}

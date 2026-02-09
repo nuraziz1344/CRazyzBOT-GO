@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/exec"
@@ -36,7 +37,7 @@ func HandleToImg(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 		return
 	}
 
-	bytes, err := c.Download(*sticker)
+	bytes, err := c.Download(context.Background(), *sticker)
 	if err != nil {
 		helper.SendTextMessage(c, msg.From, "Failed to download sticker.", &dto.Quoted{
 			QuotedMessage: msg.Message,
