@@ -180,11 +180,13 @@ func addStickerMetadata(webpData []byte, packName, author string) ([]byte, error
 		return webpData, nil
 	}
 
-	tempWebP := helper.Temp(".webp")
-	defer os.Remove(tempWebP)
+	tempInput := helper.Temp("_input.webp")
+	defer os.Remove(tempInput)
+	tempOutput := helper.Temp("_output.webp")
+	defer os.Remove(tempOutput)
 
 	// Write WebP to temp file
-	if err := os.WriteFile(tempWebP, webpData, 0644); err != nil {
+	if err := os.WriteFile(tempInput, webpData, 0644); err != nil {
 		return nil, err
 	}
 
@@ -197,13 +199,13 @@ func addStickerMetadata(webpData []byte, packName, author string) ([]byte, error
 	}
 
 	// Use webpmux to add EXIF
-	cmd := exec.Command(webpMux, "-set", "exif", tempExif, tempWebP, "-o", tempWebP)
+	cmd := exec.Command(webpMux, "-set", "exif", tempExif, tempInput, "-o", tempOutput)
 	if err := cmd.Run(); err != nil {
 		return nil, err
 	}
 
 	// Read result
-	result, err := os.ReadFile(tempWebP)
+	result, err := os.ReadFile(tempOutput)
 	if err != nil {
 		return nil, err
 	}
