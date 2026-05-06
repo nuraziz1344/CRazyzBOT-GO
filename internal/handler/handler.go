@@ -1,4 +1,4 @@
-package handler
+package bot
 
 import (
 	"context"
@@ -6,41 +6,17 @@ import (
 	"strings"
 	"time"
 
-	"bot/internal/commands"
-	"bot/internal/config"
-	"bot/internal/dto"
-	"bot/internal/helper"
-
+	"github.com/nuraziz1344/CRazyzBOT-GO/internal/bot/commands"
+	"github.com/nuraziz1344/CRazyzBOT-GO/internal/dto"
+	"github.com/nuraziz1344/CRazyzBOT-GO/internal/helper"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 )
 
-type BotHandler struct {
-	client   *whatsmeow.Client
-	config   *config.Config
-	registry *commands.Registry
-}
-
-func NewBotHandler(c *whatsmeow.Client, cfg *config.Config, reg *commands.Registry) *BotHandler {
-	return &BotHandler{
-		client:   c,
-		config:   cfg,
-		registry: reg,
-	}
-}
-
-func (h *BotHandler) EventHandler(evt any) {
-	switch v := evt.(type) {
-	case *events.Message:
-		h.handleMessage(v)
-	case *events.Connected:
-		log.Println("BOT Connected!")
-	}
-}
-
-func (h *BotHandler) handleMessage(msg *events.Message) {
+func Handle(c *whatsmeow.Client, msg *events.Message) {
+	// log.Println("Received a message!", msg.Message.GetConversation())
 	var err error
 
 	sender := helper.GetSenderNumber(msg.Info.Sender.String())
@@ -65,7 +41,7 @@ func (h *BotHandler) handleMessage(msg *events.Message) {
 	var mediaFilename string
 
 	if strings.Contains(msg.Info.Chat.String(), "@g.us") {
-		groupInfo, err = h.client.GetGroupInfo(context.Background(), msg.Info.Chat)
+		groupInfo, err = c.GetGroupInfo(context.Background(), msg.Info.Chat)
 		if err != nil {
 			log.Println("Error getting group info:", err)
 			return
@@ -82,11 +58,7 @@ func (h *BotHandler) handleMessage(msg *events.Message) {
 		body = message.GetConversation()
 	} else if message.ExtendedTextMessage != nil {
 		body = message.ExtendedTextMessage.GetText()
-		if message.ExtendedTextMessage.ContextInfo.QuotedMessage != nil {
-			quotedMessage = message.ExtendedTextMessage.ContextInfo.QuotedMessage
-			quotedStanzaID = message.ExtendedTextMessage.ContextInfo.StanzaID
-			quotedParticipant = message.ExtendedTextMessage.ContextInfo.Participant
-		}
+		quotedMessage, quotedStanzaID, quotedParticipant = extractQuotedContext(message)
 	} else if message.ImageMessage != nil {
 		mediaType = "image"
 		body = message.ImageMessage.GetCaption()
@@ -108,7 +80,7 @@ func (h *BotHandler) handleMessage(msg *events.Message) {
 		}
 	} else if message.StickerMessage != nil {
 		mediaType = "sticker"
-		if *message.StickerMessage.IsAnimated {
+		if message.StickerMessage.IsAnimated != nil && *message.StickerMessage.IsAnimated {
 			mediaType = "animated_sticker"
 		}
 		media = message.StickerMessage
@@ -139,6 +111,29 @@ func (h *BotHandler) handleMessage(msg *events.Message) {
 		MediaFilename: mediaFilename,
 	}
 
-	h.registry.Handle(h.client, &parsedMsg)
-	h.client.MarkRead(context.Background(), []string{msg.Info.ID}, time.Now(), msg.Info.Chat, msg.Info.Sender)
+	// helper.PrettyPrint(parsedMsg)
+	commands.HandleCommand(c, &parsedMsg)
+	c.MarkRead(context.Background(), []types.MessageID{types.MessageID(msg.Info.ID)}, time.Now(), msg.Info.Chat, msg.Info.Sender)
+}
+
+func extractQuotedContext(message *waE2E.Message) (*waE2E.Message, *types.MessageID, *string) {
+	if message == nil || message.ExtendedTextMessage == nil {
+		return nil, nil, nil
+	}
+
+	contextInfo := message.ExtendedTextMessage.GetContextInfo()
+	if contextInfo == nil || contextInfo.GetQuotedMessage() == nil {
+		return nil, nil, nil
+	}
+
+	return contextInfo.GetQuotedMessage(), contextInfo.StanzaID, contextInfo.Participant
+}
+
+func GetGroupName(c *whatsmeow.Client, JID types.JID) string {
+	groups, err := c.GetGroupInfo(context.Background(), JID)
+	if err != nil {
+		log.Println("Error getting group name:", err)
+		return ""
+	}
+	return groups.Name
 }
