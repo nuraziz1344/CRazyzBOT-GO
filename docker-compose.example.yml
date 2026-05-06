@@ -1,0 +1,15 @@
+services:
+  crazyzbot:
+    image: ghcr.io/nuraziz1344/crazyzbot-go:latest
+    build:
+      context: .
+    restart: unless-stopped
+    command: /bin/sh -c "mkdir -p /app/data/tmp && exec /app/crazyzbot"
+    env_file:
+      - .env
+    environment:
+      - SESSION_FILE=/app/data/session.db
+    volumes:
+      - ./data:/app/data
+    stdin_open: true
+    tty: true

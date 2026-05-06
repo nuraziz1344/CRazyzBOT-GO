@@ -10,16 +10,23 @@ import (
 	"go.mau.fi/whatsmeow"
 )
 
+const (
+	commandHelp         = "help"
+	commandHelpAlias    = "h"
+	commandPing         = "ping"
+	commandTagAll       = "tagall"
+	commandTagAllAlias  = "all"
+	commandSticker      = "sticker"
+	commandStickerAlias = "s"
+	commandToImg        = "toimg"
+)
+
 func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	prefix := os.Getenv("COMMAND_PREFIX")
 	if prefix == "" {
 		prefix = "/"
 	}
 
-	if (msg.Body == "@all" || msg.Body == "@everyone") && msg.GroupInfo != nil {
-		HandleTagAll(c, msg, msg.Body)
-		return
-	}
 
 	if !msg.IsGroup && msg.QuotedMessage == nil && (msg.MediaType == dto.MediaSticker || msg.MediaType == dto.MediaAnimatedSticker) {
 		HandleToImg(c, msg)
@@ -42,26 +49,20 @@ func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 
 	// Handle the command based on its type
 	switch command {
-	case "help":
-		helper.SendTextMessage(c, msg.From, "Available commands: /help, /ping, /tagall", nil)
-	case "ping":
+	case commandHelp, commandHelpAlias:
+		helper.SendTextMessage(c, msg.From, buildHelpMessage(prefix), nil)
+	case commandPing:
 		helper.SendTextMessage(c, msg.From, "Pong!", &dto.Quoted{
 			QuotedMessage: msg.QuotedMessage,
 			StanzaID:      &msg.StanzaID,
 			Participant:   &msg.Participant,
 		})
-	case "tagall", "all":
+	case commandTagAll, commandTagAllAlias:
 		HandleTagAll(c, msg, args)
-	case "s", "sticker":
-		HandleSticker(c, msg)
-	case "toimg":
+	case commandStickerAlias, commandSticker:
+		HandleSticker(c, msg, args)
+	case commandToImg:
 		HandleToImg(c, msg)
-	case "jid":
-		helper.SendTextMessage(c, msg.From, "Chat JID: "+msg.From.String()+"\nSender JID: "+msg.Sender.String(), &dto.Quoted{
-			QuotedMessage: msg.QuotedMessage,
-			StanzaID:      &msg.StanzaID,
-			Participant:   &msg.Participant,
-		})
 	default:
 		helper.SendTextMessage(c, msg.From, "Unknown command: "+command, &dto.Quoted{
 			QuotedMessage: msg.QuotedMessage,
@@ -71,3 +72,13 @@ func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	}
 }
 
+func buildHelpMessage(prefix string) string {
+	return strings.Join([]string{
+		"Available commands:",
+		prefix + commandHelp + ", " + prefix + commandHelpAlias + " - Show this help message",
+		prefix + commandPing + " - Check whether the bot is responding",
+		prefix + commandTagAll + ", " + prefix + commandTagAllAlias + " - Mention all group members",
+		prefix + commandSticker + ", " + prefix + commandStickerAlias + " - Convert image, video, or document media to sticker",
+		prefix + commandToImg + " - Convert a sticker to an image or animated output",
+	}, "\n")
+}

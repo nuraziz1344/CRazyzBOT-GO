@@ -2,6 +2,10 @@ package commands
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -13,7 +17,7 @@ import (
 	"go.mau.fi/whatsmeow"
 )
 
-func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
+func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
 	var media *whatsmeow.DownloadableMessage
 	var mediaType dto.MediaType
 	var isAnimated bool
@@ -50,7 +54,7 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 		isAnimated = strings.HasPrefix(mimeType, "video/")
 	}
 
-	res, err = generateSticker(res, isAnimated)
+	res, err = generateSticker(res, isAnimated, packName)
 	if err != nil {
 		log.Println("Error generating sticker:", err)
 		return
@@ -67,7 +71,7 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	}
 }
 
-func generateSticker(media []byte, isAnimated bool) ([]byte, error) {
+func generateSticker(media []byte, isAnimated bool, packName string) ([]byte, error) {
 	tempOutput := helper.Temp(".webp")
 	tempInput := helper.Temp(".png")
 	if isAnimated {
@@ -99,5 +103,95 @@ func generateSticker(media []byte, isAnimated bool) ([]byte, error) {
 	}
 
 	defer os.Remove(tempOutput)
+
+	// Add WhatsApp sticker metadata
+	author := os.Getenv("STICKER_PACK_AUTHOR")
+	if author == "" {
+		author = "CRazyzBOT"
+	}
+	if packName == "" {
+		packName = os.Getenv("STICKER_PACK_NAME")
+		if packName == "" {
+			packName = "CRazyz Stickers"
+		}
+	}
+
+	res, err = addStickerMetadata(res, packName, author)
+	if err != nil {
+		log.Println("Warning: failed to add sticker metadata:", err)
+	}
+
 	return res, nil
+}
+
+// addStickerMetadata adds WhatsApp-compatible EXIF metadata to WebP sticker
+// Based on: https://github.com/Nurutomo/wabot-aq/blob/542ff69e4e2b82423b5875f90157dcd4f9ffb4e3/lib/sticker.js#L136
+func addStickerMetadata(webpData []byte, packName, author string) ([]byte, error) {
+	// Generate random sticker pack ID (32 bytes = 64 hex chars)
+	packID := make([]byte, 32)
+	if _, err := rand.Read(packID); err != nil {
+		return nil, err
+	}
+
+	// Build metadata JSON
+	metadata := map[string]interface{}{
+		"sticker-pack-id":       hex.EncodeToString(packID),
+		"sticker-pack-name":      packName,
+		"sticker-pack-publisher": author,
+		"emojis":                 []string{""},
+	}
+
+	jsonData, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build EXIF structure: TIFF header + JSON payload
+	// Exact format from: https://github.com/Nurutomo/wabot-aq/blob/542ff69e4e2b82423b5875f90157dcd4f9ffb4e3/lib/sticker.js#L136
+	exifAttr := []byte{0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x41, 0x57, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00}
+
+	// Write JSON length at offset 14 (bytes 15-18), little-endian uint32
+	binary.LittleEndian.PutUint32(exifAttr[14:18], uint32(len(jsonData)))
+
+	// Concatenate EXIF header + JSON data
+	exif := append(exifAttr, jsonData...)
+
+	// Use webpmux to add EXIF chunk
+	webpMux, err := exec.LookPath("webpmux")
+	if err != nil {
+		// webpmux not available, return original data
+		return webpData, nil
+	}
+
+	tempInput := helper.Temp("_input.webp")
+	defer os.Remove(tempInput)
+	tempOutput := helper.Temp("_output.webp")
+	defer os.Remove(tempOutput)
+
+	// Write WebP to temp file
+	if err := os.WriteFile(tempInput, webpData, 0644); err != nil {
+		return nil, err
+	}
+
+	// Write EXIF to temp file
+	tempExif := helper.Temp(".exif")
+	defer os.Remove(tempExif)
+
+	if err := os.WriteFile(tempExif, exif, 0644); err != nil {
+		return nil, err
+	}
+
+	// Use webpmux to add EXIF
+	cmd := exec.Command(webpMux, "-set", "exif", tempExif, tempInput, "-o", tempOutput)
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+
+	// Read result
+	result, err := os.ReadFile(tempOutput)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

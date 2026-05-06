@@ -58,11 +58,7 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 		body = message.GetConversation()
 	} else if message.ExtendedTextMessage != nil {
 		body = message.ExtendedTextMessage.GetText()
-		if message.ExtendedTextMessage.ContextInfo.QuotedMessage != nil {
-			quotedMessage = message.ExtendedTextMessage.ContextInfo.QuotedMessage
-			quotedStanzaID = message.ExtendedTextMessage.ContextInfo.StanzaID
-			quotedParticipant = message.ExtendedTextMessage.ContextInfo.Participant
-		}
+		quotedMessage, quotedStanzaID, quotedParticipant = extractQuotedContext(message)
 	} else if message.ImageMessage != nil {
 		mediaType = "image"
 		body = message.ImageMessage.GetCaption()
@@ -118,6 +114,19 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 	// helper.PrettyPrint(parsedMsg)
 	commands.HandleCommand(c, &parsedMsg)
 	c.MarkRead(context.Background(), []types.MessageID{types.MessageID(msg.Info.ID)}, time.Now(), msg.Info.Chat, msg.Info.Sender)
+}
+
+func extractQuotedContext(message *waE2E.Message) (*waE2E.Message, *types.MessageID, *string) {
+	if message == nil || message.ExtendedTextMessage == nil {
+		return nil, nil, nil
+	}
+
+	contextInfo := message.ExtendedTextMessage.GetContextInfo()
+	if contextInfo == nil || contextInfo.GetQuotedMessage() == nil {
+		return nil, nil, nil
+	}
+
+	return contextInfo.GetQuotedMessage(), contextInfo.StanzaID, contextInfo.Participant
 }
 
 func GetGroupName(c *whatsmeow.Client, JID types.JID) string {
