@@ -25,11 +25,15 @@ import (
 )
 
 func main() {
+	log.Println("Starting BOT...")
+
+	// delete all media on data/tmp
+	// exec.Command("rm", "data/tmp/*.{png,gif,mp4,webp}")
+
 	cfg := config.LoadConfig()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	log.Println("Starting BOT...")
 	dbLog := waLog.Stdout("Database", cfg.LogLevel, true)
 
 	// Create a new SQLite store

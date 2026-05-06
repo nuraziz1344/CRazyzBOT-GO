@@ -10,11 +10,12 @@ func GenerateFfmpegArgs(input, output string, isAnimated bool) []string {
 	if isAnimated {
 		return []string{
 			"-y", "-i", input,
-			"-c:v", "libwebp",
+			"-c:v", "libwebp_anim",
+			"-preset", "drawing",
 			"-vf",
-			"fps=15,scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0.0,trim=start=0:end=10",
+			"fps=15,scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0.0,format=rgba,trim=start=0:end=10",
 			"-quality", "65",
-			"-compression_level", "6",
+			"-pix_fmt", "yuva420p",
 			"-loop", "0",
 			"-an",
 			"-v", "error",
@@ -24,10 +25,10 @@ func GenerateFfmpegArgs(input, output string, isAnimated bool) []string {
 		return []string{
 			"-y", "-i", input,
 			"-c:v", "libwebp",
+			"-preset", "icon",
 			"-vf",
 			"scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0.0",
 			"-quality", "75",
-			"-compression_level", "6",
 			"-v", "error",
 			output,
 		}
@@ -78,10 +79,10 @@ func GenerateFfmpegArgsWithBitrate(input, output string, isAnimated bool, durati
 		return []string{
 			"-y", "-i", input,
 			"-c:v", "libwebp",
+			"-preset", "icon",
 			"-vf",
 			"scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0.0",
-			"-quality", "70",
-			"-compression_level", "6",
+			"-quality", "50",
 			"-v", "error",
 			output,
 		}
@@ -103,12 +104,13 @@ func GenerateFfmpegArgsWithBitrate(input, output string, isAnimated bool, durati
 
 	return []string{
 		"-y", "-i", input,
-		"-c:v", "libwebp",
+		"-c:v", "libwebp_anim",
+		"-preset", "drawing",
 		"-b:v", strconv.Itoa(bitrate),
 		"-vf",
-		"fps=10,scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0.0,trim=start=0:end=10",
+		"fps=10,scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0.0,format=rgba,trim=start=0:end=10",
 		"-quality", "60",
-		"-compression_level", "6",
+		"-pix_fmt", "yuva420p",
 		"-loop", "0",
 		"-an",
 		"-v", "error",

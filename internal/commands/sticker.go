@@ -42,7 +42,7 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
 	}
 	defer os.Remove(inputPath)
 
-	res, err = generateSticker(inputPath, isAnimated, packName)
+	res, err = runStickerFFmpeg(inputPath, isAnimated, packName, false)
 	if err != nil {
 		log.Println("Error generating sticker:", err)
 		return
@@ -88,7 +88,7 @@ func HandleSticker2(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
 	}
 	defer os.Remove(inputPath)
 
-	res, err = generateStickerWithBitrate(inputPath, isAnimated, packName)
+	res, err = runStickerFFmpeg(inputPath, isAnimated, packName, true)
 	if err != nil {
 		log.Println("Error generating sticker with bitrate:", err)
 		return
@@ -104,6 +104,7 @@ func HandleSticker2(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
 func writeStickerInput(media []byte, ext string) (string, error) {
 	inputPath := helper.Temp(ext)
 	if err := os.WriteFile(inputPath, media, 0644); err != nil {
+		_ = os.Remove(inputPath)
 		return "", err
 	}
 	return inputPath, nil
@@ -152,14 +153,6 @@ func buildQuotedMessage(msg *dto.ParsedMsg) *dto.Quoted {
 		StanzaID:      &msg.StanzaID,
 		Participant:   &msg.Participant,
 	}
-}
-
-func generateSticker(inputPath string, isAnimated bool, packName string) ([]byte, error) {
-	return runStickerFFmpeg(inputPath, isAnimated, packName, false)
-}
-
-func generateStickerWithBitrate(inputPath string, isAnimated bool, packName string) ([]byte, error) {
-	return runStickerFFmpeg(inputPath, isAnimated, packName, true)
 }
 
 func runStickerFFmpeg(inputPath string, isAnimated bool, packName string, useBitrate bool) ([]byte, error) {
@@ -267,6 +260,7 @@ func addStickerMetadata(webpData []byte, packName, author string) ([]byte, error
 
 	// Write WebP to temp file
 	if err := os.WriteFile(tempInput, webpData, 0644); err != nil {
+		_ = os.Remove(tempInput)
 		return nil, err
 	}
 
@@ -275,6 +269,7 @@ func addStickerMetadata(webpData []byte, packName, author string) ([]byte, error
 	defer os.Remove(tempExif)
 
 	if err := os.WriteFile(tempExif, exif, 0644); err != nil {
+		_ = os.Remove(tempExif)
 		return nil, err
 	}
 
