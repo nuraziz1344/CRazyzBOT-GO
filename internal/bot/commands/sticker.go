@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -36,7 +37,7 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	var res []byte
 	var err error
 
-	res, err = c.Download(*media)
+	res, err = c.Download(context.Background(), *media)
 	if err != nil {
 		log.Println("Error downloading media:", err)
 		return

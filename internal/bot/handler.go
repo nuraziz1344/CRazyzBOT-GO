@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"log"
 	"strings"
 	"time"
@@ -40,7 +41,7 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 	var mediaFilename string
 
 	if strings.Contains(msg.Info.Chat.String(), "@g.us") {
-		groupInfo, err = c.GetGroupInfo(msg.Info.Chat)
+		groupInfo, err = c.GetGroupInfo(context.Background(), msg.Info.Chat)
 		if err != nil {
 			log.Println("Error getting group info:", err)
 			return
@@ -83,7 +84,7 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 		}
 	} else if message.StickerMessage != nil {
 		mediaType = "sticker"
-		if *message.StickerMessage.IsAnimated {
+		if message.StickerMessage.IsAnimated != nil && *message.StickerMessage.IsAnimated {
 			mediaType = "animated_sticker"
 		}
 		media = message.StickerMessage
@@ -116,11 +117,11 @@ func Handle(c *whatsmeow.Client, msg *events.Message) {
 
 	// helper.PrettyPrint(parsedMsg)
 	commands.HandleCommand(c, &parsedMsg)
-	c.MarkRead([]string{msg.Info.ID}, time.Now(), msg.Info.Chat, msg.Info.Sender)
+	c.MarkRead(context.Background(), []types.MessageID{types.MessageID(msg.Info.ID)}, time.Now(), msg.Info.Chat, msg.Info.Sender)
 }
 
 func GetGroupName(c *whatsmeow.Client, JID types.JID) string {
-	groups, err := c.GetGroupInfo(JID)
+	groups, err := c.GetGroupInfo(context.Background(), JID)
 	if err != nil {
 		log.Println("Error getting group name:", err)
 		return ""
