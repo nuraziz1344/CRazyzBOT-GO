@@ -81,12 +81,11 @@ func GetVideoDuration(input string) (float64, error) {
 }
 
 // GenerateFfmpegArgsWithBitrate generates FFmpeg args with dynamic bitrate based on duration
-// Target: keep file under 1MB (using 900KB as safety margin)
+// Target: keep file under 1MB (using 700KB as safety margin to account for encoding overhead)
 func GenerateFfmpegArgsWithBitrate(input, output string, isAnimated bool, duration float64) []string {
-	// Target size: 900KB (safety margin under 1MB)
+	// Target size: 700KB (safety margin under 1MB to account for WebP overhead and metadata)
 	// bitrate = (target_size * 8) / duration_in_seconds
-	// Subtract 10KB for metadata/overhead
-	targetSizeKB := 900.0 - 10.0
+	targetSizeKB := 700.0
 	bitrate := int((targetSizeKB * 8 * 1024) / duration)
 
 	// Minimum bitrate to maintain some quality (100k)
