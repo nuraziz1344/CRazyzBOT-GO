@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +17,8 @@ import (
 	"github.com/nuraziz1344/CRazyzBOT-GO/internal/helper"
 	"go.mau.fi/whatsmeow"
 )
+
+const maxStickerSize = 1024 * 1024 // 1MB
 
 func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
 	var media *whatsmeow.DownloadableMessage
@@ -60,6 +63,72 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
 		return
 	}
 
+	// Check if sticker is too large and suggest sticker2 command
+	if len(res) > maxStickerSize {
+		sizeMB := float64(len(res)) / (1024 * 1024)
+		helpMsg := fmt.Sprintf("Sticker too large (%.2f MB). Try using /sticker2 for better compression.", sizeMB)
+		helper.SendTextMessage(c, msg.From, helpMsg, &dto.Quoted{
+			QuotedMessage: msg.QuotedMessage,
+			StanzaID:      &msg.StanzaID,
+			Participant:   &msg.Participant,
+		})
+		return
+	}
+
+	err = helper.SendStickerMessage(c, msg.From, &res, isAnimated, &dto.Quoted{
+		QuotedMessage: msg.QuotedMessage,
+		StanzaID:      &msg.StanzaID,
+		Participant:   &msg.Participant,
+	})
+	if err != nil {
+		log.Println("Error sending sticker message:", err)
+		return
+	}
+}
+
+func HandleSticker2(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
+	var media *whatsmeow.DownloadableMessage
+	var mediaType dto.MediaType
+	var isAnimated bool
+
+	if msg.MediaType == dto.MediaImage || msg.MediaType == dto.MediaVideo || msg.MediaType == dto.MediaDocument {
+		media = msg.Media
+		mediaType = msg.MediaType
+	} else if msg.QuotedMessage != nil {
+		quotedMsg := helper.ParseQuotedMessage(msg.QuotedMessage)
+		if quotedMsg.MediaType == dto.MediaImage || quotedMsg.MediaType == dto.MediaVideo || quotedMsg.MediaType == dto.MediaDocument {
+			media = quotedMsg.Media
+			mediaType = quotedMsg.MediaType
+		}
+	}
+
+	if media == nil {
+		log.Println("No media found for sticker generation")
+		return
+	}
+
+	var res []byte
+	var err error
+
+	res, err = c.Download(context.Background(), *media)
+	if err != nil {
+		log.Println("Error downloading media:", err)
+		return
+	}
+
+	if mediaType == dto.MediaVideo {
+		isAnimated = true
+	} else if mediaType == dto.MediaDocument {
+		mimeType := http.DetectContentType(res)
+		isAnimated = strings.HasPrefix(mimeType, "video/")
+	}
+
+	res, err = generateStickerWithBitrate(res, isAnimated, packName)
+	if err != nil {
+		log.Println("Error generating sticker with bitrate:", err)
+		return
+	}
+
 	err = helper.SendStickerMessage(c, msg.From, &res, isAnimated, &dto.Quoted{
 		QuotedMessage: msg.QuotedMessage,
 		StanzaID:      &msg.StanzaID,
@@ -88,6 +157,71 @@ func generateSticker(media []byte, isAnimated bool, packName string) ([]byte, er
 	if err != nil {
 		return nil, err
 	}
+
+	cmd := exec.Command(ffmpeg, command...)
+
+	defer os.Remove(tempInput)
+	err = cmd.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := os.ReadFile(tempOutput)
+	if err != nil {
+		return nil, err
+	}
+
+	defer os.Remove(tempOutput)
+
+	// Add WhatsApp sticker metadata
+	author := os.Getenv("STICKER_PACK_AUTHOR")
+	if author == "" {
+		author = "CRazyzBOT"
+	}
+	if packName == "" {
+		packName = os.Getenv("STICKER_PACK_NAME")
+		if packName == "" {
+			packName = "CRazyz Stickers"
+		}
+	}
+
+	res, err = addStickerMetadata(res, packName, author)
+	if err != nil {
+		log.Println("Warning: failed to add sticker metadata:", err)
+	}
+
+	return res, nil
+}
+
+func generateStickerWithBitrate(media []byte, isAnimated bool, packName string) ([]byte, error) {
+	tempOutput := helper.Temp(".webp")
+	tempInput := helper.Temp(".png")
+	if isAnimated {
+		tempInput = helper.Temp(".mp4")
+	}
+
+	err := os.WriteFile(tempInput, media, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	ffmpeg, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		return nil, err
+	}
+
+	// Get video duration for bitrate calculation (default to 10s if not video)
+	duration := 10.0
+	if isAnimated {
+		if d, err := helper.GetVideoDuration(tempInput); err == nil && d > 0 {
+			duration = d
+			if duration > 10 {
+				duration = 10 // Cap at 10 seconds
+			}
+		}
+	}
+
+	command := helper.GenerateFfmpegArgsWithBitrate(tempInput, tempOutput, isAnimated, duration)
 
 	cmd := exec.Command(ffmpeg, command...)
 

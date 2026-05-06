@@ -11,14 +11,16 @@ import (
 )
 
 const (
-	commandHelp         = "help"
-	commandHelpAlias    = "h"
-	commandPing         = "ping"
-	commandTagAll       = "tagall"
-	commandTagAllAlias  = "all"
-	commandSticker      = "sticker"
-	commandStickerAlias = "s"
-	commandToImg        = "toimg"
+	commandHelp          = "help"
+	commandHelpAlias     = "h"
+	commandPing          = "ping"
+	commandTagAll        = "tagall"
+	commandTagAllAlias   = "all"
+	commandSticker       = "sticker"
+	commandStickerAlias  = "s"
+	commandSticker2      = "sticker2"
+	commandSticker2Alias = "s2"
+	commandToImg         = "toimg"
 )
 
 func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
@@ -61,6 +63,8 @@ func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 		HandleTagAll(c, msg, args)
 	case commandStickerAlias, commandSticker:
 		HandleSticker(c, msg, args)
+	case commandSticker2Alias, commandSticker2:
+		HandleSticker2(c, msg, args)
 	case commandToImg:
 		HandleToImg(c, msg)
 	default:
@@ -79,6 +83,7 @@ func buildHelpMessage(prefix string) string {
 		prefix + commandPing + " - Check whether the bot is responding",
 		prefix + commandTagAll + ", " + prefix + commandTagAllAlias + " - Mention all group members",
 		prefix + commandSticker + ", " + prefix + commandStickerAlias + " - Convert image, video, or document media to sticker",
+		prefix + commandSticker2 + ", " + prefix + commandSticker2Alias + " - Convert to sticker with compression (use when /sticker is too large)",
 		prefix + commandToImg + " - Convert a sticker to an image or animated output",
 	}, "\n")
 }
