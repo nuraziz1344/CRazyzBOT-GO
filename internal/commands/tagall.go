@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"bot/internal/dto"
-	"bot/internal/helper"
+	"crazyzbot-go/internal/dto"
+	"crazyzbot-go/internal/helper"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 )

@@ -11,14 +11,9 @@ func GenerateFfmpegArgs(input, output string, isAnimated bool) []string {
 		return []string{
 			"-y", "-i", input,
 			"-c:v", "libwebp",
-			"-filter_complex",
-			"color=color=black@0.0,format=yuva420p,scale=512:512[bg];" +
-				"[bg]drawbox=x=0:y=0:w=512:h=512:color=pink@0.5[out];" +
-				"[out][0:v]overlay=x=100000:y=100000:shortest=1,fps=fps=15[base];" +
-				"[0:v]scale=512:512:force_original_aspect_ratio=decrease,fps=fps=15[ov];" +
-				"[base][ov]overlay=(W-w)/2:(H-h)/2,crop=w=512:h=512[out];" +
-				"[out]trim=start=0:end=10",
-			"-quality", "80",
+			"-vf",
+			"fps=15,scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0.0,trim=start=0:end=10",
+			"-quality", "65",
 			"-compression_level", "6",
 			"-loop", "0",
 			"-an",
@@ -29,13 +24,9 @@ func GenerateFfmpegArgs(input, output string, isAnimated bool) []string {
 		return []string{
 			"-y", "-i", input,
 			"-c:v", "libwebp",
-			"-filter_complex",
-			"color=color=black@0.0,format=yuva420p,scale=512:512[bg];" +
-				"[bg]drawbox=x=0:y=0:w=512:h=512:color=pink@0.5[out];" +
-				"[out][0:v]overlay=x=100000:y=100000:shortest=1[base];" +
-				"[0:v]scale=512:512:force_original_aspect_ratio=decrease[ov];" +
-				"[base][ov]overlay=(W-w)/2:(H-h)/2,crop=w=512:h=512",
-			"-quality", "90",
+			"-vf",
+			"scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0.0",
+			"-quality", "75",
 			"-compression_level", "6",
 			"-v", "error",
 			output,
@@ -83,6 +74,19 @@ func GetVideoDuration(input string) (float64, error) {
 // GenerateFfmpegArgsWithBitrate generates FFmpeg args with dynamic bitrate based on duration
 // Target: keep file under 1MB (using 700KB as safety margin to account for encoding overhead)
 func GenerateFfmpegArgsWithBitrate(input, output string, isAnimated bool, duration float64) []string {
+	if !isAnimated {
+		return []string{
+			"-y", "-i", input,
+			"-c:v", "libwebp",
+			"-vf",
+			"scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0.0",
+			"-quality", "70",
+			"-compression_level", "6",
+			"-v", "error",
+			output,
+		}
+	}
+
 	// Target size: 700KB (safety margin under 1MB to account for WebP overhead and metadata)
 	// bitrate = (target_size * 8) / duration_in_seconds
 	targetSizeKB := 700.0
@@ -97,40 +101,17 @@ func GenerateFfmpegArgsWithBitrate(input, output string, isAnimated bool, durati
 		bitrate = 2000000
 	}
 
-	if isAnimated {
-		return []string{
-			"-y", "-i", input,
-			"-c:v", "libwebp",
-			"-b:v", strconv.Itoa(bitrate),
-			"-filter_complex",
-			"color=color=black@0.0,format=yuva420p,scale=512:512[bg];" +
-				"[bg]drawbox=x=0:y=0:w=512:h=512:color=pink@0.5[out];" +
-				"[out][0:v]overlay=x=100000:y=100000:shortest=1,fps=fps=10[base];" + // Lower FPS for smaller size
-				"[0:v]scale=512:512:force_original_aspect_ratio=decrease,fps=fps=10[ov];" +
-				"[base][ov]overlay=(W-w)/2:(H-h)/2,crop=w=512:h=512[out];" +
-				"[out]trim=start=0:end=10",
-			"-quality", "75", // Lower quality for smaller size
-			"-compression_level", "6",
-			"-loop", "0",
-			"-an",
-			"-v", "error",
-			output,
-		}
-	} else {
-		return []string{
-			"-y", "-i", input,
-			"-c:v", "libwebp",
-			"-b:v", strconv.Itoa(bitrate),
-			"-filter_complex",
-			"color=color=black@0.0,format=yuva420p,scale=512:512[bg];" +
-				"[bg]drawbox=x=0:y=0:w=512:h=512:color=pink@0.5[out];" +
-				"[out][0:v]overlay=x=100000:y=100000:shortest=1[base];" +
-				"[0:v]scale=512:512:force_original_aspect_ratio=decrease[ov];" +
-				"[base][ov]overlay=(W-w)/2:(H-h)/2,crop=w=512:h=512",
-			"-quality", "85",
-			"-compression_level", "6",
-			"-v", "error",
-			output,
-		}
+	return []string{
+		"-y", "-i", input,
+		"-c:v", "libwebp",
+		"-b:v", strconv.Itoa(bitrate),
+		"-vf",
+		"fps=10,scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0.0,trim=start=0:end=10",
+		"-quality", "60",
+		"-compression_level", "6",
+		"-loop", "0",
+		"-an",
+		"-v", "error",
+		output,
 	}
 }

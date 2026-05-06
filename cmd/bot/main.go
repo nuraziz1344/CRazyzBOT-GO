@@ -14,17 +14,20 @@ import (
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	waLog "go.mau.fi/whatsmeow/util/log"
 
-	"bot/internal/commands"
-	"bot/internal/config"
-	"bot/internal/handler"
-	"bot/internal/services/downloader"
-	"bot/internal/services/minecraft"
-	"bot/internal/services/prayer"
-	"bot/internal/services/shipping"
+	"crazyzbot-go/internal/commands"
+	"crazyzbot-go/internal/config"
+	"crazyzbot-go/internal/handler"
+	"crazyzbot-go/internal/services/downloader"
+	"crazyzbot-go/internal/services/earthquake"
+	"crazyzbot-go/internal/services/minecraft"
+	"crazyzbot-go/internal/services/prayer"
+	"crazyzbot-go/internal/services/shipping"
 )
 
 func main() {
 	cfg := config.LoadConfig()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	log.Println("Starting BOT...")
 	dbLog := waLog.Stdout("Database", cfg.LogLevel, true)
@@ -48,6 +51,7 @@ func main() {
 	prayerService := prayer.NewService()
 	shippingService := shipping.NewService(os.Getenv("BINDERBYTE_API_KEY"))
 	downloaderService := downloader.NewService()
+	earthquakeService := earthquake.NewService()
 
 	// Initialize Handlers
 	gameHandler := commands.NewGameHandler(minecraftService)
@@ -60,6 +64,7 @@ func main() {
 	registry.Register("ping", commands.HandlePing)
 	registry.Register("help", commands.HandleHelp, "h")
 	registry.Register("sticker", commands.HandleSticker, "s", "stiker")
+	registry.Register("sticker2", commands.HandleSticker2, "s2")
 	registry.Register("toimg", commands.HandleToImg)
 	registry.Register("tagall", commands.HandleTagAll, "all", "everyone")
 
@@ -102,9 +107,13 @@ func main() {
 		}
 	}
 
+	earthquake.StartScheduler(ctx, client, earthquakeService)
+	prayer.StartScheduler(ctx, client, prayerService)
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	<-c
+	cancel()
 
 	client.Disconnect()
 }

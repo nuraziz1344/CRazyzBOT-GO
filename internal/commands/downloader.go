@@ -6,9 +6,9 @@ import (
 	"io"
 	"log"
 
-	"bot/internal/dto"
-	"bot/internal/helper"
-	"bot/internal/services/downloader"
+	"crazyzbot-go/internal/dto"
+	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/services/downloader"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 )

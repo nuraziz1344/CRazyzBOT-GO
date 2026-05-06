@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"time"
 
-	"bot/internal/services"
+	"crazyzbot-go/internal/services"
 )
 
 const defaultApiKey = "b00c3361ef1b2d2ac44bc8979b9698332ddaf4b7e036ea000d7fbe50c1615189"

@@ -7,8 +7,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"bot/internal/dto"
-	"bot/internal/helper"
+	"crazyzbot-go/internal/dto"
+	"crazyzbot-go/internal/helper"
 
 	"go.mau.fi/whatsmeow"
 )

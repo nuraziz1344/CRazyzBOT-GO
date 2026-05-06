@@ -4,9 +4,9 @@ import (
 	"context"
 	"os"
 
-	"bot/internal/dto"
-	"bot/internal/helper"
-	"bot/internal/services/ocr"
+	"crazyzbot-go/internal/dto"
+	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/services/ocr"
 
 	"go.mau.fi/whatsmeow"
 )

@@ -1,8 +1,8 @@
 package minecraft
 
 import (
-	"bot/internal/services"
 	"context"
+	"crazyzbot-go/internal/services"
 	"encoding/json"
 	"fmt"
 	"net/http"
