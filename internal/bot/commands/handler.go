@@ -27,10 +27,6 @@ func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 		prefix = "/"
 	}
 
-	if (msg.Body == "@all" || msg.Body == "@everyone") && msg.GroupInfo != nil {
-		HandleTagAll(c, msg, msg.Body)
-		return
-	}
 
 	if !msg.IsGroup && msg.QuotedMessage == nil && (msg.MediaType == dto.MediaSticker || msg.MediaType == dto.MediaAnimatedSticker) {
 		HandleToImg(c, msg)
