@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/binary"
@@ -148,30 +147,14 @@ func addStickerMetadata(webpData []byte, packName, author string) ([]byte, error
 	}
 
 	// Build EXIF structure: TIFF header + JSON payload
-	// TIFF header: II (little-endian) + 0x002A + IFD offset + IFD entry
-	var exifBuf bytes.Buffer
+	// Exact format from: https://github.com/Nurutomo/wabot-aq/blob/542ff69e4e2b82423b5875f90157dcd4f9ffb4e3/lib/sticker.js#L136
+	exifAttr := []byte{0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x41, 0x57, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00}
 
-	// TIFF header: "II" (little-endian) + magic 0x002A + IFD offset (8)
-	exifBuf.Write([]byte{0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00})
+	// Write JSON length at offset 14 (bytes 15-18), little-endian uint32
+	binary.LittleEndian.PutUint32(exifAttr[14:18], uint32(len(jsonData)))
 
-	// IFD entry count (1)
-	binary.Write(&exifBuf, binary.LittleEndian, uint16(1))
-
-	// IFD entry: tag=0x5741 ("AW"), type=7 (undefined), count, value offset
-	// Tag: 0x5741 ("AW" ASCII)
-	binary.Write(&exifBuf, binary.LittleEndian, uint16(0x5741))
-	// Type: 7 (UNDEFINED)
-	binary.Write(&exifBuf, binary.LittleEndian, uint16(7))
-	// Count: JSON data length
-	binary.Write(&exifBuf, binary.LittleEndian, uint32(len(jsonData)))
-	// Value offset: 22 (header 8 + count 2 + entry 12)
-	binary.Write(&exifBuf, binary.LittleEndian, uint32(22))
-
-	// Next IFD offset (0 = no more)
-	binary.Write(&exifBuf, binary.LittleEndian, uint32(0))
-
-	// Write JSON data
-	exifBuf.Write(jsonData)
+	// Concatenate EXIF header + JSON data
+	exif := append(exifAttr, jsonData...)
 
 	// Use webpmux to add EXIF chunk
 	webpMux, err := exec.LookPath("webpmux")
@@ -194,7 +177,7 @@ func addStickerMetadata(webpData []byte, packName, author string) ([]byte, error
 	tempExif := helper.Temp(".exif")
 	defer os.Remove(tempExif)
 
-	if err := os.WriteFile(tempExif, exifBuf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(tempExif, exif, 0644); err != nil {
 		return nil, err
 	}
 
