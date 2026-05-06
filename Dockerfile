@@ -23,6 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 		ca-certificates \
 		ffmpeg \
 		imagemagick \
+		libimage-exiftool-perl \
+		webp \
 	&& rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

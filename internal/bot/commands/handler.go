@@ -64,7 +64,7 @@ func HandleCommand(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	case commandTagAll, commandTagAllAlias:
 		HandleTagAll(c, msg, args)
 	case commandStickerAlias, commandSticker:
-		HandleSticker(c, msg)
+		HandleSticker(c, msg, args)
 	case commandToImg:
 		HandleToImg(c, msg)
 	default:

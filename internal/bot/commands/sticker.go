@@ -13,7 +13,7 @@ import (
 	"go.mau.fi/whatsmeow"
 )
 
-func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
+func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
 	var media *whatsmeow.DownloadableMessage
 	var mediaType dto.MediaType
 	var isAnimated bool
@@ -50,7 +50,7 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 		isAnimated = strings.HasPrefix(mimeType, "video/")
 	}
 
-	res, err = generateSticker(res, isAnimated)
+	res, err = generateSticker(res, isAnimated, packName)
 	if err != nil {
 		log.Println("Error generating sticker:", err)
 		return
@@ -67,7 +67,7 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	}
 }
 
-func generateSticker(media []byte, isAnimated bool) ([]byte, error) {
+func generateSticker(media []byte, isAnimated bool, packName string) ([]byte, error) {
 	tempOutput := helper.Temp(".webp")
 	tempInput := helper.Temp(".png")
 	if isAnimated {
@@ -99,5 +99,31 @@ func generateSticker(media []byte, isAnimated bool) ([]byte, error) {
 	}
 
 	defer os.Remove(tempOutput)
+
+	// Add WhatsApp sticker metadata using exiftool
+	author := os.Getenv("STICKER_PACK_AUTHOR")
+	if author == "" {
+		author = "CRazyzBOT"
+	}
+	if packName == "" {
+		packName = os.Getenv("STICKER_PACK_NAME")
+		if packName == "" {
+			packName = "CRazyz Stickers"
+		}
+	}
+
+	exiftool, err := exec.LookPath("exiftool")
+	if err == nil {
+		cmd := exec.Command(exiftool,
+			"-overwrite_original",
+			"-sticker-pack-name="+packName,
+			"-sticker-author-name="+author,
+			tempOutput,
+		)
+		if err := cmd.Run(); err != nil {
+			log.Println("Warning: failed to add sticker metadata:", err)
+		}
+	}
+
 	return res, nil
 }
