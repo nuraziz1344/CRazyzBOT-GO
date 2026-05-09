@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"bot/internal/dto"
-	"bot/internal/helper"
-	"bot/internal/services"
+	"crazyzbot-go/internal/dto"
+	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/services"
 	"go.mau.fi/whatsmeow"
 )
 

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"bot/internal/services"
+	"crazyzbot-go/internal/services"
 )
 
 type Metadata struct {

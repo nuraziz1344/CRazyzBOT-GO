@@ -13,51 +13,36 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/dto"
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/helper"
+	"crazyzbot-go/internal/dto"
+	"crazyzbot-go/internal/helper"
+
 	"go.mau.fi/whatsmeow"
 )
 
 const maxStickerSize = 1024 * 1024 // 1MB
 
 func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
-	var media *whatsmeow.DownloadableMessage
-	var mediaType dto.MediaType
-	var isAnimated bool
-
-	if msg.MediaType == dto.MediaImage || msg.MediaType == dto.MediaVideo || msg.MediaType == dto.MediaDocument {
-		media = msg.Media
-		mediaType = msg.MediaType
-	} else if msg.QuotedMessage != nil {
-		quotedMsg := helper.ParseQuotedMessage(msg.QuotedMessage)
-		if quotedMsg.MediaType == dto.MediaImage || quotedMsg.MediaType == dto.MediaVideo || quotedMsg.MediaType == dto.MediaDocument {
-			media = quotedMsg.Media
-			mediaType = quotedMsg.MediaType
-		}
-	}
-
-	if media == nil {
+	media, mediaType, ok := resolveStickerMedia(msg)
+	if !ok {
 		log.Println("No media found for sticker generation")
 		return
 	}
 
-	var res []byte
-	var err error
-
-	res, err = c.Download(context.Background(), *media)
+	res, err := c.Download(context.Background(), *media)
 	if err != nil {
 		log.Println("Error downloading media:", err)
 		return
 	}
 
-	if mediaType == dto.MediaVideo {
-		isAnimated = true
-	} else if mediaType == dto.MediaDocument {
-		mimeType := http.DetectContentType(res)
-		isAnimated = strings.HasPrefix(mimeType, "video/")
+	ext, isAnimated := detectStickerInput(mediaType, res)
+	inputPath, err := writeStickerInput(res, ext)
+	if err != nil {
+		log.Println("Error preparing sticker input:", err)
+		return
 	}
+	defer os.Remove(inputPath)
 
-	res, err = generateSticker(res, isAnimated, packName)
+	res, err = runStickerFFmpeg(inputPath, isAnimated, packName, false)
 	if err != nil {
 		log.Println("Error generating sticker:", err)
 		return
@@ -75,11 +60,7 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
 		return
 	}
 
-	err = helper.SendStickerMessage(c, msg.From, &res, isAnimated, &dto.Quoted{
-		QuotedMessage: msg.QuotedMessage,
-		StanzaID:      &msg.StanzaID,
-		Participant:   &msg.Participant,
-	})
+	err = helper.SendStickerMessage(c, msg.From, &res, isAnimated, buildQuotedMessage(msg))
 	if err != nil {
 		log.Println("Error sending sticker message:", err)
 		return
@@ -87,82 +68,117 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
 }
 
 func HandleSticker2(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
-	var media *whatsmeow.DownloadableMessage
-	var mediaType dto.MediaType
-	var isAnimated bool
-
-	if msg.MediaType == dto.MediaImage || msg.MediaType == dto.MediaVideo || msg.MediaType == dto.MediaDocument {
-		media = msg.Media
-		mediaType = msg.MediaType
-	} else if msg.QuotedMessage != nil {
-		quotedMsg := helper.ParseQuotedMessage(msg.QuotedMessage)
-		if quotedMsg.MediaType == dto.MediaImage || quotedMsg.MediaType == dto.MediaVideo || quotedMsg.MediaType == dto.MediaDocument {
-			media = quotedMsg.Media
-			mediaType = quotedMsg.MediaType
-		}
-	}
-
-	if media == nil {
+	media, mediaType, ok := resolveStickerMedia(msg)
+	if !ok {
 		log.Println("No media found for sticker generation")
 		return
 	}
 
-	var res []byte
-	var err error
-
-	res, err = c.Download(context.Background(), *media)
+	res, err := c.Download(context.Background(), *media)
 	if err != nil {
 		log.Println("Error downloading media:", err)
 		return
 	}
 
-	if mediaType == dto.MediaVideo {
-		isAnimated = true
-	} else if mediaType == dto.MediaDocument {
-		mimeType := http.DetectContentType(res)
-		isAnimated = strings.HasPrefix(mimeType, "video/")
+	ext, isAnimated := detectStickerInput(mediaType, res)
+	inputPath, err := writeStickerInput(res, ext)
+	if err != nil {
+		log.Println("Error preparing sticker input:", err)
+		return
 	}
+	defer os.Remove(inputPath)
 
-	res, err = generateStickerWithBitrate(res, isAnimated, packName)
+	res, err = runStickerFFmpeg(inputPath, isAnimated, packName, true)
 	if err != nil {
 		log.Println("Error generating sticker with bitrate:", err)
 		return
 	}
 
-	err = helper.SendStickerMessage(c, msg.From, &res, isAnimated, &dto.Quoted{
-		QuotedMessage: msg.QuotedMessage,
-		StanzaID:      &msg.StanzaID,
-		Participant:   &msg.Participant,
-	})
+	err = helper.SendStickerMessage(c, msg.From, &res, isAnimated, buildQuotedMessage(msg))
 	if err != nil {
 		log.Println("Error sending sticker message:", err)
 		return
 	}
 }
 
-func generateSticker(media []byte, isAnimated bool, packName string) ([]byte, error) {
+func writeStickerInput(media []byte, ext string) (string, error) {
+	inputPath := helper.Temp(ext)
+	if err := os.WriteFile(inputPath, media, 0644); err != nil {
+		_ = os.Remove(inputPath)
+		return "", err
+	}
+	return inputPath, nil
+}
+
+func resolveStickerMedia(msg *dto.ParsedMsg) (*whatsmeow.DownloadableMessage, dto.MediaType, bool) {
+	if isSupportedStickerMedia(msg.MediaType) {
+		return msg.Media, msg.MediaType, msg.Media != nil
+	}
+	if msg.QuotedMessage == nil {
+		return nil, "", false
+	}
+
+	quotedMsg := helper.ParseQuotedMessage(msg.QuotedMessage)
+	if !isSupportedStickerMedia(quotedMsg.MediaType) || quotedMsg.Media == nil {
+		return nil, "", false
+	}
+
+	return quotedMsg.Media, quotedMsg.MediaType, true
+}
+
+func isSupportedStickerMedia(mediaType dto.MediaType) bool {
+	return mediaType == dto.MediaImage || mediaType == dto.MediaVideo || mediaType == dto.MediaDocument
+}
+
+func detectStickerInput(mediaType dto.MediaType, media []byte) (string, bool) {
+	switch mediaType {
+	case dto.MediaVideo:
+		return ".mp4", true
+	case dto.MediaDocument:
+		mimeType := http.DetectContentType(media)
+		if mimeType == "image/gif" {
+			return ".gif", true
+		}
+		if strings.HasPrefix(mimeType, "video/") {
+			return ".mp4", true
+		}
+	}
+
+	return ".png", false
+}
+
+func buildQuotedMessage(msg *dto.ParsedMsg) *dto.Quoted {
+	return &dto.Quoted{
+		QuotedMessage: msg.QuotedMessage,
+		StanzaID:      &msg.StanzaID,
+		Participant:   &msg.Participant,
+	}
+}
+
+func runStickerFFmpeg(inputPath string, isAnimated bool, packName string, useBitrate bool) ([]byte, error) {
 	tempOutput := helper.Temp(".webp")
-	tempInput := helper.Temp(".png")
-	if isAnimated {
-		tempInput = helper.Temp(".mp4")
-	}
+	defer os.Remove(tempOutput)
 
-	err := os.WriteFile(tempInput, media, 0644)
-	if err != nil {
-		return nil, err
-	}
-
-	command := helper.GenerateFfmpegArgs(tempInput, tempOutput, isAnimated)
 	ffmpeg, err := exec.LookPath("ffmpeg")
 	if err != nil {
 		return nil, err
 	}
 
-	cmd := exec.Command(ffmpeg, command...)
+	command := helper.GenerateFfmpegArgs(inputPath, tempOutput, isAnimated)
+	if useBitrate {
+		duration := 10.0
+		if isAnimated {
+			if d, err := helper.GetVideoDuration(inputPath); err == nil && d > 0 {
+				duration = d
+				if duration > 10 {
+					duration = 10
+				}
+			}
+		}
+		command = helper.GenerateFfmpegArgsWithBitrate(inputPath, tempOutput, isAnimated, duration)
+	}
 
-	defer os.Remove(tempInput)
-	err = cmd.Run()
-	if err != nil {
+	if err := exec.Command(ffmpeg, command...).Run(); err != nil {
 		return nil, err
 	}
 
@@ -171,21 +187,7 @@ func generateSticker(media []byte, isAnimated bool, packName string) ([]byte, er
 		return nil, err
 	}
 
-	defer os.Remove(tempOutput)
-
-	// Add WhatsApp sticker metadata
-	author := os.Getenv("STICKER_PACK_AUTHOR")
-	if author == "" {
-		author = "CRazyzBOT"
-	}
-	if packName == "" {
-		packName = os.Getenv("STICKER_PACK_NAME")
-		if packName == "" {
-			packName = "CRazyz Stickers"
-		}
-	}
-
-	res, err = addStickerMetadata(res, packName, author)
+	res, err = addStickerMetadata(res, resolveStickerPackName(packName), resolveStickerAuthor())
 	if err != nil {
 		log.Println("Warning: failed to add sticker metadata:", err)
 	}
@@ -193,69 +195,23 @@ func generateSticker(media []byte, isAnimated bool, packName string) ([]byte, er
 	return res, nil
 }
 
-func generateStickerWithBitrate(media []byte, isAnimated bool, packName string) ([]byte, error) {
-	tempOutput := helper.Temp(".webp")
-	tempInput := helper.Temp(".png")
-	if isAnimated {
-		tempInput = helper.Temp(".mp4")
-	}
-
-	err := os.WriteFile(tempInput, media, 0644)
-	if err != nil {
-		return nil, err
-	}
-
-	ffmpeg, err := exec.LookPath("ffmpeg")
-	if err != nil {
-		return nil, err
-	}
-
-	// Get video duration for bitrate calculation (default to 10s if not video)
-	duration := 10.0
-	if isAnimated {
-		if d, err := helper.GetVideoDuration(tempInput); err == nil && d > 0 {
-			duration = d
-			if duration > 10 {
-				duration = 10 // Cap at 10 seconds
-			}
-		}
-	}
-
-	command := helper.GenerateFfmpegArgsWithBitrate(tempInput, tempOutput, isAnimated, duration)
-
-	cmd := exec.Command(ffmpeg, command...)
-
-	defer os.Remove(tempInput)
-	err = cmd.Run()
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := os.ReadFile(tempOutput)
-	if err != nil {
-		return nil, err
-	}
-
-	defer os.Remove(tempOutput)
-
-	// Add WhatsApp sticker metadata
+func resolveStickerAuthor() string {
 	author := os.Getenv("STICKER_PACK_AUTHOR")
 	if author == "" {
-		author = "CRazyzBOT"
+		return "CRazyzBOT"
 	}
+	return author
+}
+
+func resolveStickerPackName(packName string) string {
+	if packName != "" {
+		return packName
+	}
+	packName = os.Getenv("STICKER_PACK_NAME")
 	if packName == "" {
-		packName = os.Getenv("STICKER_PACK_NAME")
-		if packName == "" {
-			packName = "CRazyz Stickers"
-		}
+		return "CRazyz Stickers"
 	}
-
-	res, err = addStickerMetadata(res, packName, author)
-	if err != nil {
-		log.Println("Warning: failed to add sticker metadata:", err)
-	}
-
-	return res, nil
+	return packName
 }
 
 // addStickerMetadata adds WhatsApp-compatible EXIF metadata to WebP sticker
@@ -269,7 +225,7 @@ func addStickerMetadata(webpData []byte, packName, author string) ([]byte, error
 
 	// Build metadata JSON
 	metadata := map[string]interface{}{
-		"sticker-pack-id":       hex.EncodeToString(packID),
+		"sticker-pack-id":        hex.EncodeToString(packID),
 		"sticker-pack-name":      packName,
 		"sticker-pack-publisher": author,
 		"emojis":                 []string{""},
@@ -304,6 +260,7 @@ func addStickerMetadata(webpData []byte, packName, author string) ([]byte, error
 
 	// Write WebP to temp file
 	if err := os.WriteFile(tempInput, webpData, 0644); err != nil {
+		_ = os.Remove(tempInput)
 		return nil, err
 	}
 
@@ -312,6 +269,7 @@ func addStickerMetadata(webpData []byte, packName, author string) ([]byte, error
 	defer os.Remove(tempExif)
 
 	if err := os.WriteFile(tempExif, exif, 0644); err != nil {
+		_ = os.Remove(tempExif)
 		return nil, err
 	}
 

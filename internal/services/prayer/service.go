@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"bot/internal/services"
+	"crazyzbot-go/internal/services"
 )
 
 type CityResponse struct {
@@ -71,7 +71,7 @@ func (s *Service) SearchCity(ctx context.Context, keyword string) ([]services.Ci
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
 		return nil, err
 	}
-	
+
 	var cities []services.City
 	for _, c := range res.Data {
 		cities = append(cities, services.City{
@@ -84,8 +84,12 @@ func (s *Service) SearchCity(ctx context.Context, keyword string) ([]services.Ci
 
 func (s *Service) GetSchedule(ctx context.Context, cityID string) (*services.PrayerSchedule, error) {
 	now := time.Now()
+	return s.GetScheduleByDate(ctx, cityID, now)
+}
+
+func (s *Service) GetScheduleByDate(ctx context.Context, cityID string, date time.Time) (*services.PrayerSchedule, error) {
 	url := fmt.Sprintf("https://api.myquran.com/v2/sholat/jadwal/%s/%d/%d/%d",
-		cityID, now.Year(), now.Month(), now.Day())
+		cityID, date.Year(), date.Month(), date.Day())
 
 	resp, err := http.Get(url)
 	if err != nil {

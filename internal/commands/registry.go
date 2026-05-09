@@ -6,7 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"bot/internal/dto"
+	"crazyzbot-go/internal/dto"
+
 	"go.mau.fi/whatsmeow"
 )
 
@@ -37,12 +38,12 @@ func (r *Registry) Register(name string, handler CommandHandler, aliases ...stri
 
 func (r *Registry) Handle(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	// 1. Handle TagAll/Everyone special case
-	if (msg.Body == "@all" || msg.Body == "@everyone") && msg.GroupInfo != nil {
-		if handler, ok := r.commands["tagall"]; ok {
-			handler(c, msg, msg.Body)
-			return
-		}
-	}
+	// if (msg.Body == "@all" || msg.Body == "@everyone") && msg.GroupInfo != nil {
+	// 	if handler, ok := r.commands["tagall"]; ok {
+	// 		handler(c, msg, msg.Body)
+	// 		return
+	// 	}
+	// }
 
 	// 2. Handle Sticker/Image conversion (media-based trigger)
 	if !msg.IsGroup && msg.QuotedMessage == nil && (msg.MediaType == dto.MediaSticker || msg.MediaType == dto.MediaAnimatedSticker) {
