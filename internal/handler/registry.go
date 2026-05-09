@@ -1,7 +1,8 @@
 package handler
 
 import (
-	"bot/internal/dto"
+	"crazyzbot-go/internal/dto"
+
 	"go.mau.fi/whatsmeow"
 )
 
