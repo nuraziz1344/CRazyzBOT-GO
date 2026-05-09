@@ -3,7 +3,7 @@ package helper
 import (
 	"strings"
 
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/dto"
+	"crazyzbot-go/internal/dto"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 )

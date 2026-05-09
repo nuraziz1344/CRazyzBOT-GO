@@ -7,8 +7,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/dto"
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/helper"
+	"crazyzbot-go/internal/dto"
+	"crazyzbot-go/internal/helper"
+
 	"go.mau.fi/whatsmeow"
 )
 
@@ -26,7 +27,7 @@ func getSticker(msg *dto.ParsedMsg) (media *whatsmeow.DownloadableMessage) {
 	return nil
 }
 
-func HandleToImg(c *whatsmeow.Client, msg *dto.ParsedMsg) {
+func HandleToImg(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
 	sticker := getSticker(msg)
 	if sticker == nil {
 		helper.SendTextMessage(c, msg.From, "Please send a sticker or reply to a sticker with this command.", &dto.Quoted{
@@ -39,11 +40,7 @@ func HandleToImg(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 
 	bytes, err := c.Download(context.Background(), *sticker)
 	if err != nil {
-		helper.SendTextMessage(c, msg.From, "Failed to download sticker.", &dto.Quoted{
-			QuotedMessage: msg.Message,
-			StanzaID:      &msg.StanzaID,
-			Participant:   &msg.Participant,
-		})
+		helper.SendTextMessage(c, msg.From, "Failed to download sticker.", nil)
 		log.Printf("Failed to download sticker: %v\n", err)
 		return
 	}
@@ -57,11 +54,7 @@ func HandleToImg(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	}
 
 	if err != nil {
-		helper.SendTextMessage(c, msg.From, "Failed to convert sticker.", &dto.Quoted{
-			QuotedMessage: msg.Message,
-			StanzaID:      &msg.StanzaID,
-			Participant:   &msg.Participant,
-		})
+		helper.SendTextMessage(c, msg.From, "Failed to convert sticker.", nil)
 		log.Printf("Failed to convert sticker: %v\n", err)
 		return
 	}
@@ -81,13 +74,7 @@ func HandleToImg(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	}
 
 	if err != nil {
-		helper.SendTextMessage(c, msg.From, "Failed to send image.", &dto.Quoted{
-			QuotedMessage: msg.Message,
-			StanzaID:      &msg.StanzaID,
-			Participant:   &msg.Participant,
-		})
 		log.Printf("Failed to send image: %v\n", err)
-		return
 	}
 }
 

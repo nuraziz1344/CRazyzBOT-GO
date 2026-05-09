@@ -4,7 +4,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/nuraziz1344/CRazyzBOT-GO/internal/dto"
+	"crazyzbot-go/internal/dto"
+
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
@@ -90,6 +91,40 @@ func SendImageMessage(c *whatsmeow.Client, from types.JID, media *[]byte, quoted
 		Mimetype:      proto.String("image/png"),
 		DirectPath:    &res.DirectPath,
 		FileLength:    &res.FileLength,
+	}
+
+	if quoted != nil {
+		imageMessage.ContextInfo = GenerateReplyContextInfo(quoted)
+	}
+	_, err = c.SendMessage(context.Background(), from, &waE2E.Message{ImageMessage: imageMessage})
+
+	if err != nil {
+		log.Println("Error sending message:", err)
+	}
+
+	return nil
+}
+
+func SendImageMessageWithCaption(c *whatsmeow.Client, from types.JID, media *[]byte, caption string, quoted *dto.Quoted) error {
+	var err error
+
+	res, err := c.Upload(context.Background(), *media, whatsmeow.MediaImage)
+	if err != nil {
+		return err
+	}
+
+	imageMessage := &waE2E.ImageMessage{
+		URL:           &res.URL,
+		FileSHA256:    res.FileSHA256,
+		FileEncSHA256: res.FileEncSHA256,
+		MediaKey:      res.MediaKey,
+		Mimetype:      proto.String("image/png"),
+		DirectPath:    &res.DirectPath,
+		FileLength:    &res.FileLength,
+	}
+
+	if caption != "" {
+		imageMessage.Caption = proto.String(caption)
 	}
 
 	if quoted != nil {
