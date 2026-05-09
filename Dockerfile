@@ -15,7 +15,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=1 GOOS=linux go build -o /out/crazyzbot ./cmd
+RUN CGO_ENABLED=1 GOOS=linux go build -o /out/crazyzbot ./cmd/bot
 
 FROM debian:bookworm-slim
 
