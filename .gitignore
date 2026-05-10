@@ -5,7 +5,7 @@
 *.json
 *.txt
 
-data/session.db
+data/*.db
 .env
 
 vendor

@@ -9,6 +9,7 @@ import (
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
 	"crazyzbot-go/internal/services"
+	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types"
@@ -24,7 +25,7 @@ func NewGameHandler(mcService services.MinecraftProvider) *GameHandler {
 	}
 }
 
-func (h *GameHandler) HandleMinecraft(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
+func (h *GameHandler) HandleMinecraft(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	if args == "" {
 		// Default check for authorized groups
 		authorized := false

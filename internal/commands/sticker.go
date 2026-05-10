@@ -15,13 +15,14 @@ import (
 
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
 )
 
 const maxStickerSize = 1024 * 1024 // 1MB
 
-func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
+func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, store storage.SubscriptionStore) {
 	media, mediaType, ok := resolveStickerMedia(msg)
 	if !ok {
 		log.Println("No media found for sticker generation")
@@ -67,7 +68,7 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
 	}
 }
 
-func HandleSticker2(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string) {
+func HandleSticker2(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, store storage.SubscriptionStore) {
 	media, mediaType, ok := resolveStickerMedia(msg)
 	if !ok {
 		log.Println("No media found for sticker generation")

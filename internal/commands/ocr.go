@@ -7,11 +7,12 @@ import (
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
 	"crazyzbot-go/internal/services/ocr"
+	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
 )
 
-func HandleOCR(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
+func HandleOCR(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	var media *whatsmeow.DownloadableMessage
 
 	if msg.MediaType == dto.MediaImage {

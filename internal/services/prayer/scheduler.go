@@ -12,6 +12,7 @@ import (
 
 	"crazyzbot-go/internal/helper"
 	"crazyzbot-go/internal/services"
+	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types"
@@ -22,43 +23,51 @@ type prayerTime struct {
 	At   time.Time
 }
 
-func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Service) {
+func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Service, store storage.SubscriptionStore) {
 	go func() {
-		cityID, cityName := resolveCity(ctx, service)
-		if cityID == "" {
-			log.Println("Prayer scheduler: PRAYER_CITY_ID or PRAYER_CITY not set; scheduler disabled")
-			return
-		}
-
 		for {
-			nextPrayer, scheduleDate, err := getNextPrayer(ctx, service, cityID)
+			// Get all prayer subscriptions
+			prayerSubs, err := store.ListPrayerSubscriptions(ctx)
 			if err != nil {
-				log.Println("Prayer scheduler error:", err)
+				log.Printf("Prayer scheduler: failed to get prayer subscriptions: %v", err)
 				if !sleepOrDone(ctx, 5*time.Minute) {
 					return
 				}
 				continue
 			}
 
-			wait := time.Until(nextPrayer.At)
-			if wait < time.Second {
-				wait = time.Second
-			}
-
-			log.Printf("Prayer scheduler: next %s at %s (%s)", nextPrayer.Name, nextPrayer.At.Format(time.RFC3339), scheduleDate.Format("2006-01-02"))
-
-			if !sleepOrDone(ctx, wait) {
-				return
-			}
-
-			targets := collectPrayerTargets(ctx, client)
-			if len(targets) == 0 {
-				log.Println("Prayer scheduler: no targets found")
+			if len(prayerSubs) == 0 {
+				// log.Println("Prayer scheduler: no prayer subscriptions found")
+				if !sleepOrDone(ctx, 5*time.Minute) {
+					return
+				}
 				continue
 			}
 
-			message := buildPrayerMessage(nextPrayer, cityName)
-			for _, jid := range targets {
+			// Check each subscribed user's prayer time
+			for jidStr, cityID := range prayerSubs {
+				nextPrayer, err := getNextPrayerForJID(ctx, service, jidStr, cityID)
+				if err != nil {
+					log.Printf("Prayer scheduler error for %s: %v", jidStr, err)
+					continue
+				}
+				if nextPrayer == nil {
+					continue
+				}
+
+				wait := time.Until(nextPrayer.At)
+				if wait < time.Second {
+					wait = time.Second
+				}
+
+				log.Printf("Prayer scheduler: next %s at %s for %s", nextPrayer.Name, nextPrayer.At.Format(time.RFC3339), jidStr)
+
+				if !sleepOrDone(ctx, wait) {
+					return
+				}
+
+				message := buildPrayerMessage(nextPrayer, "") // City name optional for now
+				jid := types.NewJID(jidStr, "s.whatsapp.net")
 				helper.SendTextMessage(client, jid, message, nil)
 			}
 		}
@@ -84,23 +93,23 @@ func resolveCity(ctx context.Context, service *Service) (string, string) {
 	return id, cityName
 }
 
-func getNextPrayer(ctx context.Context, service *Service, cityID string) (*prayerTime, time.Time, error) {
+func getNextPrayerForJID(ctx context.Context, service *Service, jidStr string, cityID string) (*prayerTime, error) {
 	now := time.Now()
 
 	pt, err := getNextPrayerForDate(ctx, service, cityID, now)
 	if err == nil && pt != nil {
-		return pt, now, nil
+		return pt, nil
 	}
 
 	tomorrow := now.AddDate(0, 0, 1)
 	pt, err = getNextPrayerForDate(ctx, service, cityID, tomorrow)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, err
 	}
 	if pt == nil {
-		return nil, time.Time{}, fmt.Errorf("no prayer time found")
+		return nil, fmt.Errorf("no prayer time found")
 	}
-	return pt, tomorrow, nil
+	return pt, nil
 }
 
 func getNextPrayerForDate(ctx context.Context, service *Service, cityID string, date time.Time) (*prayerTime, error) {

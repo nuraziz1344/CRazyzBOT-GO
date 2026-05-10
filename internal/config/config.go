@@ -5,9 +5,10 @@ import (
 )
 
 type Config struct {
-	SessionFile   string
-	LogLevel      string
-	CommandPrefix string
+	SessionFile        string
+	LogLevel           string
+	CommandPrefix      string
+	SubscriptionDBFile string
 }
 
 func LoadConfig() *Config {
@@ -26,9 +27,15 @@ func LoadConfig() *Config {
 		prefix = "/"
 	}
 
+	subscriptionDB := os.Getenv("SUBSCRIPTION_DB_FILE")
+	if subscriptionDB == "" {
+		subscriptionDB = "data/subscriptions.db"
+	}
+
 	return &Config{
-		SessionFile:   sessionFile,
-		LogLevel:      logLevel,
-		CommandPrefix: prefix,
+		SessionFile:        sessionFile,
+		LogLevel:           logLevel,
+		CommandPrefix:      prefix,
+		SubscriptionDBFile: subscriptionDB,
 	}
 }

@@ -7,22 +7,25 @@ import (
 	"sync"
 
 	"crazyzbot-go/internal/dto"
+	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
 )
 
-type CommandHandler func(c *whatsmeow.Client, msg *dto.ParsedMsg, args string)
+type CommandHandler func(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore)
 
 type Registry struct {
 	commands map[string]CommandHandler
 	aliases  map[string]string
+	subStore storage.SubscriptionStore
 	mu       sync.RWMutex
 }
 
-func NewRegistry() *Registry {
+func NewRegistry(subStore storage.SubscriptionStore) *Registry {
 	return &Registry{
 		commands: make(map[string]CommandHandler),
 		aliases:  make(map[string]string),
+		subStore: subStore,
 	}
 }
 
@@ -40,7 +43,7 @@ func (r *Registry) Handle(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	// 1. Handle TagAll/Everyone special case
 	// if (msg.Body == "@all" || msg.Body == "@everyone") && msg.GroupInfo != nil {
 	// 	if handler, ok := r.commands["tagall"]; ok {
-	// 		handler(c, msg, msg.Body)
+	// 		handler(c, msg, msg.Body, r.subStore)
 	// 		return
 	// 	}
 	// }
@@ -48,7 +51,7 @@ func (r *Registry) Handle(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 	// 2. Handle Sticker/Image conversion (media-based trigger)
 	if !msg.IsGroup && msg.QuotedMessage == nil && (msg.MediaType == dto.MediaSticker || msg.MediaType == dto.MediaAnimatedSticker) {
 		if handler, ok := r.commands["toimg"]; ok {
-			handler(c, msg, "")
+			handler(c, msg, "", r.subStore)
 			return
 		}
 	}
@@ -84,6 +87,6 @@ func (r *Registry) Handle(c *whatsmeow.Client, msg *dto.ParsedMsg) {
 
 	if ok {
 		log.Printf("Executing command: %s (Args: %s)", cmdName, args)
-		go handler(c, msg, args)
+		go handler(c, msg, args, r.subStore)
 	}
 }

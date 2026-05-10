@@ -8,6 +8,7 @@ import (
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
 	"crazyzbot-go/internal/services"
+	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
 )
@@ -22,7 +23,7 @@ func NewUtilityHandler(shippingService services.ShippingProvider) *UtilityHandle
 	}
 }
 
-func (h *UtilityHandler) HandleResi(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
+func (h *UtilityHandler) HandleResi(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	parts := strings.Split(args, " ")
 	if len(parts) < 2 {
 		helper.SendTextMessage(c, msg.From, "Usage: /cekresi <courier> <awb>", nil)

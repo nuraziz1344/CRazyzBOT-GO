@@ -9,6 +9,7 @@ import (
 
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
 )
@@ -27,7 +28,7 @@ func getSticker(msg *dto.ParsedMsg) (media *whatsmeow.DownloadableMessage) {
 	return nil
 }
 
-func HandleToImg(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
+func HandleToImg(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	sticker := getSticker(msg)
 	if sticker == nil {
 		helper.SendTextMessage(c, msg.From, "Please send a sticker or reply to a sticker with this command.", &dto.Quoted{

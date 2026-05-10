@@ -13,3 +13,8 @@ services:
       - ./data:/app/data
     stdin_open: true
     tty: true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M

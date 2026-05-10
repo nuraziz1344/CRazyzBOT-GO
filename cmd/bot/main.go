@@ -22,6 +22,7 @@ import (
 	"crazyzbot-go/internal/services/minecraft"
 	"crazyzbot-go/internal/services/prayer"
 	"crazyzbot-go/internal/services/shipping"
+	"crazyzbot-go/internal/storage"
 )
 
 func main() {
@@ -57,6 +58,13 @@ func main() {
 	downloaderService := downloader.NewService()
 	earthquakeService := earthquake.NewService()
 
+	// Initialize Storage
+	subscriptionStore, err := storage.NewSQLiteSubscriptionStore(cfg.SubscriptionDBFile)
+	if err != nil {
+		log.Fatalf("Failed to initialize subscription storage: %v", err)
+	}
+	defer subscriptionStore.Close()
+
 	// Initialize Handlers
 	gameHandler := commands.NewGameHandler(minecraftService)
 	religionHandler := commands.NewReligionHandler(prayerService)
@@ -64,7 +72,7 @@ func main() {
 	downloaderHandler := commands.NewDownloaderHandler(downloaderService)
 
 	// Register commands
-	registry := commands.NewRegistry()
+	registry := commands.NewRegistry(subscriptionStore)
 	registry.Register("ping", commands.HandlePing)
 	registry.Register("help", commands.HandleHelp, "h")
 	registry.Register("sticker", commands.HandleSticker, "s", "stiker")
@@ -84,6 +92,10 @@ func main() {
 	registry.Register("twitter", downloaderHandler.HandleDownloader, "x", "twitterdl")
 
 	registry.Register("ocr", commands.HandleOCR)
+	registry.Register("prayersubscribe", commands.HandlePrayerSubscribe, "psub")
+	registry.Register("prayerunsubscribe", commands.HandlePrayerUnsubscribe, "punsub")
+	registry.Register("earthquakesubscribe", commands.HandleEarthquakeSubscribe, "esub")
+	registry.Register("earthquakeunsubscribe", commands.HandleEarthquakeUnsubscribe, "eunsub")
 
 	// Initialize Handler
 	botHandler := handler.NewBotHandler(client, cfg, registry)
@@ -111,8 +123,8 @@ func main() {
 		}
 	}
 
-	earthquake.StartScheduler(ctx, client, earthquakeService)
-	prayer.StartScheduler(ctx, client, prayerService)
+	earthquake.StartScheduler(ctx, client, earthquakeService, subscriptionStore)
+	prayer.StartScheduler(ctx, client, prayerService, subscriptionStore)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)

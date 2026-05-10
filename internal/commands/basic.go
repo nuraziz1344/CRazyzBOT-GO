@@ -3,11 +3,12 @@ package commands
 import (
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
 )
 
-func HandlePing(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
+func HandlePing(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	helper.SendTextMessage(c, msg.From, "Pong!", &dto.Quoted{
 		QuotedMessage: msg.Message,
 		StanzaID:      &msg.StanzaID,
@@ -15,7 +16,7 @@ func HandlePing(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
 	})
 }
 
-func HandleHelp(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
+func HandleHelp(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	helpText := `*CRazyzBOT Features*
 
 *General*
@@ -29,8 +30,7 @@ func HandleHelp(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
 - /ocr - Extract text from an image
 
 *Group Tools*
-- /tagall (all) - Mention everyone in the current group
-- @all or @everyone - Trigger tag-all without a slash command
+- /tagall [message] - Mention everyone with optional message
 
 *Downloader*
 - /yts <query> - Search YouTube
@@ -42,13 +42,19 @@ func HandleHelp(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
 
 *Utilities*
 - /minecraft (mc) [host] - Check Minecraft server status
-- /sholat (jadwalsholat) <city> - Get prayer times
+- /sholat <city> - Get prayer times (e.g., /sholat Jakarta)
 - /sholat listkota <keyword> - Search supported prayer cities
 - /cekresi <courier> <awb> - Track a shipment
 
+*Prayer & Earthquake*
+- /psub <city> - Subscribe to prayer notifications for a city (Example: /prayersubscribe Jakarta)
+- /punsub - Unsubscribe from prayer notifications
+- /esub - Subscribe to earthquake notifications (magnitude > 4.0)
+- /eunsub - Unsubscribe from earthquake notifications
+
 *Auto Features*
 - Send a sticker in private chat to auto-convert it with /toimg
-- Earthquake alerts and prayer reminders run automatically when configured
+- Earthquake alerts and prayer reminders run automatically when configured for subscribed users
 `
 	helper.SendTextMessage(c, msg.From, helpText, nil)
 }

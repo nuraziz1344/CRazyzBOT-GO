@@ -9,6 +9,8 @@ import (
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
 	"crazyzbot-go/internal/services/downloader"
+	"crazyzbot-go/internal/storage"
+
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 )
@@ -23,7 +25,7 @@ func NewDownloaderHandler(service *downloader.Service) *DownloaderHandler {
 	}
 }
 
-func (h *DownloaderHandler) HandleYTSearch(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
+func (h *DownloaderHandler) HandleYTSearch(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	if args == "" {
 		helper.SendTextMessage(c, msg.From, "Usage: /yts <query>", nil)
 		return
@@ -49,7 +51,7 @@ func (h *DownloaderHandler) HandleYTSearch(c *whatsmeow.Client, msg *dto.ParsedM
 	helper.SendTextMessage(c, msg.From, reply, nil)
 }
 
-func (h *DownloaderHandler) HandleDownloader(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
+func (h *DownloaderHandler) HandleDownloader(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	url := args
 	if url == "" {
 		helper.SendTextMessage(c, msg.From, "Please provide a URL", nil)

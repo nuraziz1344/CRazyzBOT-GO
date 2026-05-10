@@ -6,11 +6,13 @@ import (
 
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/storage"
+
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 )
 
-func HandleTagAll(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
+func HandleTagAll(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	if !msg.IsGroup {
 		helper.SendTextMessage(c, msg.From, "This command can only be used in groups.", nil)
 		return
@@ -24,7 +26,7 @@ func HandleTagAll(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
 	}
 
 	var message string
-	if args == "@all" || args == "@everyone" || (args != "" && args != "tagall") {
+	if args != "" {
 		message = args
 	} else {
 		message = "Tagging all members in the group"

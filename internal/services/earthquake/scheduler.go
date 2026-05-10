@@ -3,18 +3,18 @@ package earthquake
 import (
 	"context"
 	"log"
-	"os"
-	"strings"
 	"time"
 
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types"
 )
 
-func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Service) {
+func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Service, store storage.SubscriptionStore) {
 	ticker := time.NewTicker(service.GetInterval())
+	startupTime := time.Now() // Track when scheduler started
 
 	go func() {
 		defer ticker.Stop()
@@ -34,11 +34,33 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 			if eventID == "" || eventID == service.GetLastEventID() {
 				return
 			}
-			service.SetLastEventID(eventID)
 
+			// Parse event time to check if it's recent
+			// The DateTime field is in RFC3339 format (e.g., "2026-05-09T07:10:29+07:00")
+			eventTime, err := time.Parse(time.RFC3339, event.DateTime)
+			if err != nil {
+				log.Printf("Error parsing earthquake time '%s': %v", event.DateTime, err)
+				// If we can't parse time, still process but log error
+				eventTime = time.Now() // Assume recent if parsing fails
+			}
+
+			// Only process if:
+			// 1. Magnitude > 4.0
+			// 2. Event happened after scheduler started (not old data)
+			// 3. Event happened within last 2x polling interval (to account for slight delays)
 			if event.Magnitude <= 4.0 {
 				return
 			}
+			if eventTime.Before(startupTime) {
+				log.Printf("Skipping old earthquake event from %v", eventTime)
+				return
+			}
+			if time.Since(eventTime) > (2 * service.GetInterval()) {
+				log.Printf("Skipping earthquake event that's too old: %v", eventTime)
+				return
+			}
+
+			service.SetLastEventID(eventID)
 
 			alert := Alert{Text: formatMessage(*event), ShakemapURL: buildShakemapURL(event.ShakeMap)}
 			if alert.ShakemapURL != "" {
@@ -47,12 +69,18 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 				}
 			}
 
-			targets := collectEarthquakeTargets(ctx, client)
-			if len(targets) == 0 {
+			// Get earthquake subscribers from storage
+			subscribers, err := store.ListEarthquakeSubscriptions(ctx)
+			if err != nil {
+				log.Printf("Error getting earthquake subscribers: %v", err)
+				return
+			}
+			if len(subscribers) == 0 {
 				return
 			}
 
-			for _, jid := range targets {
+			for _, jidStr := range subscribers {
+				jid := types.NewJID(jidStr, "s.whatsapp.net")
 				if len(alert.Shakemap) > 0 {
 					helpTextErr := helper.SendImageMessageWithCaption(client, jid, &alert.Shakemap, alert.Text, nil)
 					if helpTextErr != nil {
@@ -75,51 +103,4 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 			}
 		}
 	}()
-}
-
-func collectEarthquakeTargets(ctx context.Context, client *whatsmeow.Client) []types.JID {
-	targets := make(map[string]types.JID)
-
-	ownerNumber := strings.TrimSpace(os.Getenv("OWNER_NUMBER"))
-	if ownerNumber != "" {
-		jid := types.NewJID(ownerNumber, "s.whatsapp.net")
-		targets[jid.String()] = jid
-	}
-
-	groups, err := client.GetJoinedGroups(ctx)
-	if err != nil {
-		log.Println("Error getting joined groups:", err)
-		return mapToSlice(targets)
-	}
-
-	for _, group := range groups {
-		if matchesEarthquakeGroupName(group.Name) {
-			jid := group.JID
-			targets[jid.String()] = jid
-		}
-	}
-
-	return mapToSlice(targets)
-}
-
-func matchesEarthquakeGroupName(name string) bool {
-	name = strings.ToLower(strings.TrimSpace(name))
-	if name == "" {
-		return false
-	}
-	keys := []string{"tcbb", "sutechbayo", "100% halal"}
-	for _, key := range keys {
-		if strings.Contains(name, key) {
-			return true
-		}
-	}
-	return false
-}
-
-func mapToSlice(m map[string]types.JID) []types.JID {
-	list := make([]types.JID, 0, len(m))
-	for _, jid := range m {
-		list = append(list, jid)
-	}
-	return list
 }

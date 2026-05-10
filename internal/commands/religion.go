@@ -8,6 +8,8 @@ import (
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
 	"crazyzbot-go/internal/services"
+	"crazyzbot-go/internal/storage"
+
 	"go.mau.fi/whatsmeow"
 )
 
@@ -21,7 +23,7 @@ func NewReligionHandler(prayerService services.PrayerProvider) *ReligionHandler 
 	}
 }
 
-func (h *ReligionHandler) HandlePrayer(c *whatsmeow.Client, msg *dto.ParsedMsg, args string) {
+func (h *ReligionHandler) HandlePrayer(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	if args == "" {
 		helper.SendTextMessage(c, msg.From, "Usage: /sholat <city name> or /sholat listkota <keyword>", nil)
 		return
