@@ -25,7 +25,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 		imagemagick \
 		libimage-exiftool-perl \
 		webp \
-	&& rm -rf /var/lib/apt/lists/*
+		python3 \
+		python3-pip \
+	&& rm -rf /var/lib/apt/lists/* \
+	&& pip3 install --no-cache-dir yt-dlp
 
 WORKDIR /app
 
