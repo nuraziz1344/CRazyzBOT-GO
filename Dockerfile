@@ -25,8 +25,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 		imagemagick \
 		libimage-exiftool-perl \
 		webp \
+        wget \
+        curl \
 	&& rm -rf /var/lib/apt/lists/* \
-	&& curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
+	&& wget -O /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
 	&& chmod a+rx /usr/local/bin/yt-dlp
 
 WORKDIR /app
