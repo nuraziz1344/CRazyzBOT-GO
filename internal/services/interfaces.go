@@ -63,6 +63,9 @@ type DownloadResult struct {
 	Title    string
 	MimeType string
 	Buffer   []byte
+	Caption  string
+	Filename string
+	Provider string
 }
 
 type Metadata struct {

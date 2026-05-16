@@ -169,3 +169,109 @@ func SendGifMessage(c *whatsmeow.Client, from types.JID, media *[]byte, quoted *
 
 	return nil
 }
+
+func SendVideoMessage(c *whatsmeow.Client, from types.JID, media *[]byte, caption string, quoted *dto.Quoted) error {
+	res, err := c.Upload(context.Background(), *media, whatsmeow.MediaVideo)
+	if err != nil {
+		return err
+	}
+
+	videoMessage := &waE2E.VideoMessage{
+		URL:           &res.URL,
+		Mimetype:      proto.String("video/mp4"),
+		FileSHA256:    res.FileSHA256,
+		FileEncSHA256: res.FileEncSHA256,
+		FileLength:    &res.FileLength,
+		MediaKey:      res.MediaKey,
+		DirectPath:    &res.DirectPath,
+	}
+
+	if caption != "" {
+		videoMessage.Caption = proto.String(caption)
+	}
+
+	if quoted != nil {
+		videoMessage.ContextInfo = GenerateReplyContextInfo(quoted)
+	}
+
+	_, err = c.SendMessage(context.Background(), from, &waE2E.Message{VideoMessage: videoMessage})
+	if err != nil {
+		log.Println("Error sending message:", err)
+	}
+
+	return err
+}
+
+func SendAudioMessage(c *whatsmeow.Client, from types.JID, media *[]byte, mimeType string, filename string, quoted *dto.Quoted) error {
+	if mimeType == "" {
+		mimeType = "audio/mpeg"
+	}
+
+	res, err := c.Upload(context.Background(), *media, whatsmeow.MediaAudio)
+	if err != nil {
+		return err
+	}
+
+	audioMessage := &waE2E.AudioMessage{
+		URL:           &res.URL,
+		Mimetype:      proto.String(mimeType),
+		FileSHA256:    res.FileSHA256,
+		FileEncSHA256: res.FileEncSHA256,
+		FileLength:    &res.FileLength,
+		MediaKey:      res.MediaKey,
+		DirectPath:    &res.DirectPath,
+		PTT:           proto.Bool(false),
+	}
+
+	if quoted != nil {
+		audioMessage.ContextInfo = GenerateReplyContextInfo(quoted)
+	}
+
+	_, err = c.SendMessage(context.Background(), from, &waE2E.Message{AudioMessage: audioMessage})
+	if err != nil {
+		log.Println("Error sending message:", err)
+	}
+
+	return err
+}
+
+func SendDocumentMessage(c *whatsmeow.Client, from types.JID, media *[]byte, mimeType string, filename string, caption string, quoted *dto.Quoted) error {
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	if filename == "" {
+		filename = "download"
+	}
+
+	res, err := c.Upload(context.Background(), *media, whatsmeow.MediaDocument)
+	if err != nil {
+		return err
+	}
+
+	documentMessage := &waE2E.DocumentMessage{
+		URL:           &res.URL,
+		Mimetype:      proto.String(mimeType),
+		Title:         proto.String(filename),
+		FileName:      proto.String(filename),
+		FileSHA256:    res.FileSHA256,
+		FileEncSHA256: res.FileEncSHA256,
+		FileLength:    &res.FileLength,
+		MediaKey:      res.MediaKey,
+		DirectPath:    &res.DirectPath,
+	}
+
+	if caption != "" {
+		documentMessage.Caption = proto.String(caption)
+	}
+
+	if quoted != nil {
+		documentMessage.ContextInfo = GenerateReplyContextInfo(quoted)
+	}
+
+	_, err = c.SendMessage(context.Background(), from, &waE2E.Message{DocumentMessage: documentMessage})
+	if err != nil {
+		log.Println("Error sending message:", err)
+	}
+
+	return err
+}

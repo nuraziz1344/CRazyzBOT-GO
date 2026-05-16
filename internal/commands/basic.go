@@ -35,7 +35,8 @@ func HandleHelp(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store stor
 *Downloader*
 - /yts <query> - Search YouTube
 - /ytdl <url> - Download from supported video links
-- /tiktok (tt) <url> - Download TikTok media
+- /ytdl2 <url> - Download YouTube using the scraper provider
+- /tiktok (t) <url> - Download TikTok media
 - /instagram (ig, igdl) <url> - Download Instagram media
 - /facebook (fb, fbdl) <url> - Download Facebook media
 - /twitter (x, twitterdl) <url> - Download Twitter/X media
