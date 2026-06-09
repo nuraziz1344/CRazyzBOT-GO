@@ -8,6 +8,7 @@ import (
 
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/logutil"
 	"crazyzbot-go/internal/services"
 	"crazyzbot-go/internal/storage"
 
@@ -26,6 +27,7 @@ func NewGameHandler(mcService services.MinecraftProvider) *GameHandler {
 }
 
 func (h *GameHandler) HandleMinecraft(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	logutil.Info(ctx, "Minecraft command", "args", args, "from", msg.From.String())
 	if args == "" {
 		// Default check for authorized groups
 		authorized := false
@@ -51,6 +53,7 @@ func (h *GameHandler) HandleMinecraft(ctx context.Context, c *whatsmeow.Client, 
 		if authorized {
 			status, err := h.mcService.GetServerTapStatus(ctx)
 			if err != nil {
+				logutil.Error(ctx, "Minecraft server status fetch failed", "error", err)
 				helper.SendTextMessage(ctx, c, msg.From, "Failed to fetch default server status: "+err.Error(), nil)
 				return
 			}
@@ -67,6 +70,7 @@ func (h *GameHandler) HandleMinecraft(ctx context.Context, c *whatsmeow.Client, 
 
 	status, err := h.mcService.GetStatus(ctx, ip)
 	if err != nil {
+		logutil.Error(ctx, "Minecraft server status failed", "ip", ip, "error", err)
 		helper.SendTextMessage(ctx, c, msg.From, "Failed to get server status", nil)
 		return
 	}

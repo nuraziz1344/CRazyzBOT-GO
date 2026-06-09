@@ -5,12 +5,14 @@ import (
 
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/logutil"
 	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
 )
 
 func HandlePing(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	logutil.Debug(ctx, "Ping command invoked", "from", msg.From.String())
 	helper.SendTextMessage(ctx, c, msg.From, "Pong!", &dto.Quoted{
 		QuotedMessage: msg.Message,
 		StanzaID:      &msg.StanzaID,
@@ -19,6 +21,7 @@ func HandlePing(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, ar
 }
 
 func HandleHelp(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	logutil.Debug(ctx, "Help command invoked", "from", msg.From.String())
 	helpText := `*CRazyzBOT Features*
 
 	*General*

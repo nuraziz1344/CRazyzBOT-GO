@@ -7,6 +7,7 @@ import (
 
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/logutil"
 	"crazyzbot-go/internal/services"
 	"crazyzbot-go/internal/storage"
 
@@ -24,6 +25,7 @@ func NewReligionHandler(prayerService services.PrayerProvider) *ReligionHandler 
 }
 
 func (h *ReligionHandler) HandlePrayer(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	logutil.Info(ctx, "Prayer schedule command", "args", args, "from", msg.From.String())
 	if args == "" {
 		helper.SendTextMessage(ctx, c, msg.From, "Usage: /sholat <city name> or /sholat listkota <keyword>", nil)
 		return
@@ -38,6 +40,7 @@ func (h *ReligionHandler) HandlePrayer(ctx context.Context, c *whatsmeow.Client,
 
 		cities, err := h.prayerService.SearchCity(ctx, keyword)
 		if err != nil {
+			logutil.Error(ctx, "City search failed", "keyword", keyword, "error", err)
 			helper.SendTextMessage(ctx, c, msg.From, "Error searching city", nil)
 			return
 		}
@@ -59,12 +62,14 @@ func (h *ReligionHandler) HandlePrayer(ctx context.Context, c *whatsmeow.Client,
 	// But first try as keyword
 	cities, err := h.prayerService.SearchCity(ctx, args)
 	if err != nil || len(cities) == 0 {
+		logutil.Error(ctx, "City lookup failed", "args", args, "error", err, "count", len(cities))
 		helper.SendTextMessage(ctx, c, msg.From, "City not found", nil)
 		return
 	}
 
 	schedule, err := h.prayerService.GetSchedule(ctx, cities[0].ID)
 	if err != nil {
+		logutil.Error(ctx, "Prayer schedule fetch failed", "cityID", cities[0].ID, "error", err)
 		helper.SendTextMessage(ctx, c, msg.From, "Error getting schedule", nil)
 		return
 	}

@@ -6,6 +6,7 @@ import (
 
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/logutil"
 	"crazyzbot-go/internal/services/ocr"
 	"crazyzbot-go/internal/storage"
 
@@ -13,6 +14,7 @@ import (
 )
 
 func HandleOCR(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	logutil.Info(ctx, "OCR command", "from", msg.From.String())
 	var media *whatsmeow.DownloadableMessage
 
 	if msg.MediaType == dto.MediaImage {
@@ -31,6 +33,7 @@ func HandleOCR(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, arg
 
 	data, err := c.Download(ctx, *media)
 	if err != nil {
+		logutil.Error(ctx, "OCR download failed", "error", err)
 		helper.SendTextMessage(ctx, c, msg.From, "Failed to download image", nil)
 		return
 	}
@@ -39,6 +42,7 @@ func HandleOCR(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, arg
 	tempFile := helper.Temp(".jpg")
 	err = os.WriteFile(tempFile, data, 0644)
 	if err != nil {
+		logutil.Error(ctx, "OCR temp file write failed", "error", err)
 		helper.SendTextMessage(ctx, c, msg.From, "Failed to save temp file", nil)
 		return
 	}
@@ -46,6 +50,7 @@ func HandleOCR(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, arg
 
 	text, err := ocr.Recognize(tempFile)
 	if err != nil {
+		logutil.Error(ctx, "OCR recognition failed", "error", err)
 		helper.SendTextMessage(ctx, c, msg.From, "OCR Failed: "+err.Error(), nil)
 		return
 	}

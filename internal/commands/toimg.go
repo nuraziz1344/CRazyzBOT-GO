@@ -29,6 +29,7 @@ func getSticker(msg *dto.ParsedMsg) (media *whatsmeow.DownloadableMessage) {
 }
 
 func HandleToImg(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	logutil.Info(ctx, "ToImg command", "from", msg.From.String())
 	sticker := getSticker(msg)
 	if sticker == nil {
 		helper.SendTextMessage(ctx, c, msg.From, "Please send a sticker or reply to a sticker with this command.", &dto.Quoted{

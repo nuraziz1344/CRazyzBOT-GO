@@ -7,6 +7,7 @@ import (
 
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/logutil"
 	"crazyzbot-go/internal/services"
 	"crazyzbot-go/internal/storage"
 
@@ -24,6 +25,7 @@ func NewUtilityHandler(shippingService services.ShippingProvider) *UtilityHandle
 }
 
 func (h *UtilityHandler) HandleResi(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	logutil.Info(ctx, "Resi command", "args", args, "from", msg.From.String())
 	parts := strings.Split(args, " ")
 	if len(parts) < 2 {
 		helper.SendTextMessage(ctx, c, msg.From, "Usage: /cekresi <courier> <awb>", nil)
@@ -35,6 +37,7 @@ func (h *UtilityHandler) HandleResi(ctx context.Context, c *whatsmeow.Client, ms
 
 	res, err := h.shippingService.CheckResi(ctx, courier, awb)
 	if err != nil {
+		logutil.Error(ctx, "Shipping check failed", "courier", courier, "awb", awb, "error", err)
 		helper.SendTextMessage(ctx, c, msg.From, "Error: "+err.Error(), nil)
 		return
 	}

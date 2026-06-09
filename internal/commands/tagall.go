@@ -6,6 +6,7 @@ import (
 
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/logutil"
 	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
@@ -13,6 +14,7 @@ import (
 )
 
 func HandleTagAll(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	logutil.Info(ctx, "TagAll command", "group", msg.From.String(), "sender", msg.Phone)
 	if !msg.IsGroup {
 		helper.SendTextMessage(ctx, c, msg.From, "This command can only be used in groups.", nil)
 		return

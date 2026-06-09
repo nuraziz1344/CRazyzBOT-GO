@@ -25,6 +25,7 @@ func NewDownloaderHandler(service *downloader.Service) *DownloaderHandler {
 }
 
 func (h *DownloaderHandler) HandleYTSearch(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	logutil.Info(ctx, "YTSearch command", "query", args, "from", msg.From.String())
 	if args == "" {
 		helper.SendTextMessage(ctx, c, msg.From, "Usage: /yts <query>", nil)
 		return
@@ -32,6 +33,7 @@ func (h *DownloaderHandler) HandleYTSearch(ctx context.Context, c *whatsmeow.Cli
 
 	res, err := h.service.Search(ctx, args, 5)
 	if err != nil {
+		logutil.Error(ctx, "YouTube search failed", "query", args, "error", err)
 		helper.SendTextMessage(ctx, c, msg.From, "Error searching: "+err.Error(), nil)
 		return
 	}
@@ -51,6 +53,7 @@ func (h *DownloaderHandler) HandleYTSearch(ctx context.Context, c *whatsmeow.Cli
 }
 
 func (h *DownloaderHandler) HandleYTSearch2(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	logutil.Info(ctx, "YTSearch2 command", "query", args, "from", msg.From.String())
 	if args == "" {
 		helper.SendTextMessage(ctx, c, msg.From, "Usage: /yts2 <query>", nil)
 		return
@@ -58,6 +61,7 @@ func (h *DownloaderHandler) HandleYTSearch2(ctx context.Context, c *whatsmeow.Cl
 
 	res, err := h.service.SearchInvidious(ctx, args, 5)
 	if err != nil {
+		logutil.Error(ctx, "YouTube search (invidious) failed", "query", args, "error", err)
 		helper.SendTextMessage(ctx, c, msg.From, "Error searching: "+err.Error(), nil)
 		return
 	}
@@ -92,6 +96,7 @@ func formatDuration(seconds int) string {
 }
 
 func (h *DownloaderHandler) HandleDownloader(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	logutil.Info(ctx, "Download command", "url", args, "from", msg.From.String())
 	url := args
 	if url == "" {
 		helper.SendTextMessage(ctx, c, msg.From, "Please provide a URL", nil)
@@ -102,6 +107,7 @@ func (h *DownloaderHandler) HandleDownloader(ctx context.Context, c *whatsmeow.C
 
 	results, err := h.service.Resolve(ctx, url)
 	if err != nil {
+		logutil.Error(ctx, "Download resolve failed", "url", url, "error", err)
 		helper.SendTextMessage(ctx, c, msg.From, "Failed to download: "+err.Error(), nil)
 		return
 	}
