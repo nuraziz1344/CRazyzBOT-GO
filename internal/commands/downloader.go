@@ -50,6 +50,47 @@ func (h *DownloaderHandler) HandleYTSearch(ctx context.Context, c *whatsmeow.Cli
 	helper.SendTextMessage(ctx, c, msg.From, reply, nil)
 }
 
+func (h *DownloaderHandler) HandleYTSearch2(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	if args == "" {
+		helper.SendTextMessage(ctx, c, msg.From, "Usage: /yts2 <query>", nil)
+		return
+	}
+
+	res, err := h.service.SearchInvidious(ctx, args, 5)
+	if err != nil {
+		helper.SendTextMessage(ctx, c, msg.From, "Error searching: "+err.Error(), nil)
+		return
+	}
+
+	if len(res) == 0 {
+		helper.SendTextMessage(ctx, c, msg.From, "No results found", nil)
+		return
+	}
+
+	reply := "YouTube Search Results:\n\n"
+	for i, video := range res {
+		duration := formatDuration(int(video.Duration))
+		reply += fmt.Sprintf("%d. %s\n   👤 %s • 🕒 %s\n   🔗 %s\n\n", i+1, video.Title, video.Uploader, duration, video.Webpage)
+	}
+	reply += "Type /ytdl <url> to download."
+
+	helper.SendTextMessage(ctx, c, msg.From, reply, nil)
+}
+
+func formatDuration(seconds int) string {
+	if seconds <= 0 {
+		return "0:00"
+	}
+	mins := seconds / 60
+	secs := seconds % 60
+	hours := mins / 60
+	mins = mins % 60
+	if hours > 0 {
+		return fmt.Sprintf("%d:%02d:%02d", hours, mins, secs)
+	}
+	return fmt.Sprintf("%d:%02d", mins, secs)
+}
+
 func (h *DownloaderHandler) HandleDownloader(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	url := args
 	if url == "" {

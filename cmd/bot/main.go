@@ -86,6 +86,7 @@ func main() {
 	registry.Register("cekresi", utilityHandler.HandleResi)
 
 	registry.Register("yts", downloaderHandler.HandleYTSearch)
+	registry.Register("yts2", downloaderHandler.HandleYTSearch2)
 	registry.Register("ytdl", downloaderHandler.HandleDownloader)
 	registry.Register("ytdl2", downloaderHandler.HandleDownloader)
 	registry.Register("tiktok", downloaderHandler.HandleDownloader, "t")
