@@ -48,8 +48,7 @@ func (h *BotHandler) handleMessage(msg *events.Message) {
 	// Inject logID and request-scoped logger into context for traceability
 	ctx := logutil.WithLogID(context.Background())
 
-	logger := logutil.LoggerFromContext(ctx)
-	logger.Info("Incoming message",
+	logutil.Info(ctx, "Incoming message",
 		"msgID", parsedMsg.StanzaID,
 		"from", parsedMsg.Body,
 		"sender", parsedMsg.Phone,

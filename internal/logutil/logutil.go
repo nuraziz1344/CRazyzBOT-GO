@@ -79,3 +79,23 @@ func LoggerFromContext(ctx context.Context) *slog.Logger {
 	}
 	return logger
 }
+
+// Debug logs at debug level with context-scoped logger.
+func Debug(ctx context.Context, msg string, args ...any) {
+	LoggerFromContext(ctx).Debug(msg, args...)
+}
+
+// Info logs at info level with context-scoped logger.
+func Info(ctx context.Context, msg string, args ...any) {
+	LoggerFromContext(ctx).Info(msg, args...)
+}
+
+// Warn logs at warn level with context-scoped logger.
+func Warn(ctx context.Context, msg string, args ...any) {
+	LoggerFromContext(ctx).Warn(msg, args...)
+}
+
+// Error logs at error level with context-scoped logger.
+func Error(ctx context.Context, msg string, args ...any) {
+	LoggerFromContext(ctx).Error(msg, args...)
+}

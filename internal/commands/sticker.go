@@ -24,30 +24,29 @@ import (
 const maxStickerSize = 1024 * 1024 // 1MB
 
 func HandleSticker(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, store storage.SubscriptionStore) {
-	logger := logutil.LoggerFromContext(ctx)
 	media, mediaType, ok := resolveStickerMedia(msg)
 	if !ok {
-		logger.Warn("No media found for sticker generation")
+		logutil.Warn(ctx, "No media found for sticker generation")
 		return
 	}
 
 	res, err := c.Download(ctx, *media)
 	if err != nil {
-		logger.Error("Error downloading media", "error", err)
+		logutil.Error(ctx, "Error downloading media", "error", err)
 		return
 	}
 
 	ext, isAnimated := detectStickerInput(mediaType, res)
 	inputPath, err := writeStickerInput(res, ext)
 	if err != nil {
-		logger.Error("Error preparing sticker input", "error", err)
+		logutil.Error(ctx, "Error preparing sticker input", "error", err)
 		return
 	}
 	defer os.Remove(inputPath)
 
 	res, err = runStickerFFmpeg(inputPath, isAnimated, packName, false)
 	if err != nil {
-		logger.Error("Error generating sticker", "error", err)
+		logutil.Error(ctx, "Error generating sticker", "error", err)
 		return
 	}
 
@@ -65,42 +64,41 @@ func HandleSticker(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg,
 
 	err = helper.SendStickerMessage(ctx, c, msg.From, &res, isAnimated, buildQuotedMessage(msg))
 	if err != nil {
-		logger.Error("Error sending sticker message", "error", err)
+		logutil.Error(ctx, "Error sending sticker message", "error", err)
 		return
 	}
 }
 
 func HandleSticker2(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, store storage.SubscriptionStore) {
-	logger := logutil.LoggerFromContext(ctx)
 	media, mediaType, ok := resolveStickerMedia(msg)
 	if !ok {
-		logger.Warn("No media found for sticker generation")
+		logutil.Warn(ctx, "No media found for sticker generation")
 		return
 	}
 
 	res, err := c.Download(ctx, *media)
 	if err != nil {
-		logger.Error("Error downloading media", "error", err)
+		logutil.Error(ctx, "Error downloading media", "error", err)
 		return
 	}
 
 	ext, isAnimated := detectStickerInput(mediaType, res)
 	inputPath, err := writeStickerInput(res, ext)
 	if err != nil {
-		logger.Error("Error preparing sticker input", "error", err)
+		logutil.Error(ctx, "Error preparing sticker input", "error", err)
 		return
 	}
 	defer os.Remove(inputPath)
 
 	res, err = runStickerFFmpeg(inputPath, isAnimated, packName, true)
 	if err != nil {
-		logger.Error("Error generating sticker with bitrate", "error", err)
+		logutil.Error(ctx, "Error generating sticker with bitrate", "error", err)
 		return
 	}
 
 	err = helper.SendStickerMessage(ctx, c, msg.From, &res, isAnimated, buildQuotedMessage(msg))
 	if err != nil {
-		logger.Error("Error sending sticker message", "error", err)
+		logutil.Error(ctx, "Error sending sticker message", "error", err)
 		return
 	}
 }

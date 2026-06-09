@@ -29,7 +29,6 @@ func getSticker(msg *dto.ParsedMsg) (media *whatsmeow.DownloadableMessage) {
 }
 
 func HandleToImg(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
-	logger := logutil.LoggerFromContext(ctx)
 	sticker := getSticker(msg)
 	if sticker == nil {
 		helper.SendTextMessage(ctx, c, msg.From, "Please send a sticker or reply to a sticker with this command.", &dto.Quoted{
@@ -43,7 +42,7 @@ func HandleToImg(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, a
 	bytes, err := c.Download(ctx, *sticker)
 	if err != nil {
 		helper.SendTextMessage(ctx, c, msg.From, "Failed to download sticker.", nil)
-		logger.Error("Failed to download sticker", "error", err)
+		logutil.Error(ctx, "Failed to download sticker", "error", err)
 		return
 	}
 
@@ -57,7 +56,7 @@ func HandleToImg(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, a
 
 	if err != nil {
 		helper.SendTextMessage(ctx, c, msg.From, "Failed to convert sticker.", nil)
-		logger.Error("Failed to convert sticker", "error", err)
+		logutil.Error(ctx, "Failed to convert sticker", "error", err)
 		return
 	}
 
@@ -76,7 +75,7 @@ func HandleToImg(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, a
 	}
 
 	if err != nil {
-		logger.Error("Failed to send image", "error", err)
+		logutil.Error(ctx, "Failed to send image", "error", err)
 	}
 }
 

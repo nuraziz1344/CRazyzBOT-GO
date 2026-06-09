@@ -20,10 +20,9 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 		defer ticker.Stop()
 
 		checkAndNotify := func() {
-			logger := logutil.LoggerFromContext(ctx)
 			event, err := service.GetLatest(ctx)
 			if err != nil {
-				logger.Error("BMKG fetch error", "error", err)
+				logutil.Error(ctx, "BMKG fetch error", "error", err)
 				return
 			}
 			if event == nil {
@@ -37,7 +36,7 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 
 			eventTime, err := time.Parse(time.RFC3339, event.DateTime)
 			if err != nil {
-				logger.Warn("Error parsing earthquake time", "datetime", event.DateTime, "error", err)
+				logutil.Warn(ctx, "Error parsing earthquake time", "datetime", event.DateTime, "error", err)
 				eventTime = time.Now()
 			}
 
@@ -45,11 +44,11 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 				return
 			}
 			if eventTime.Before(startupTime) {
-				logger.Info("Skipping old earthquake event", "eventTime", eventTime)
+				logutil.Info(ctx, "Skipping old earthquake event", "eventTime", eventTime)
 				return
 			}
 			if time.Since(eventTime) > (2 * service.GetInterval()) {
-				logger.Info("Skipping old earthquake event (interval)", "eventTime", eventTime)
+				logutil.Info(ctx, "Skipping old earthquake event (interval)", "eventTime", eventTime)
 				return
 			}
 
@@ -64,7 +63,7 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 
 			subscribers, err := store.ListEarthquakeSubscriptions(ctx)
 			if err != nil {
-				logger.Error("Error getting earthquake subscribers", "error", err)
+				logutil.Error(ctx, "Error getting earthquake subscribers", "error", err)
 				return
 			}
 			if len(subscribers) == 0 {
@@ -75,7 +74,7 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 				jid := types.NewJID(jidStr, "s.whatsapp.net")
 				if len(alert.Shakemap) > 0 {
 					if sendErr := helper.SendImageMessageWithCaption(ctx, client, jid, &alert.Shakemap, alert.Text, nil); sendErr != nil {
-						logger.Error("Error sending shakemap", "error", sendErr, "jid", jidStr)
+						logutil.Error(ctx, "Error sending shakemap", "error", sendErr, "jid", jidStr)
 					}
 				} else {
 					helper.SendTextMessage(ctx, client, jid, alert.Text, nil)

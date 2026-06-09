@@ -48,7 +48,8 @@ func main() {
 		log.Fatalf("Failed to get device store: %v", err)
 	}
 
-	clientLog := waLog.Stdout("Client", cfg.LogLevel, true)
+	// Log levels: ERROR, WARN, INFO, DEBUG
+	clientLog := waLog.Stdout("Client", "WARN", true) 
 	client := whatsmeow.NewClient(deviceStore, clientLog)
 
 	// Initialize Services

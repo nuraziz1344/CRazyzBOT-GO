@@ -71,7 +71,7 @@ func (h *DownloaderHandler) HandleDownloader(ctx context.Context, c *whatsmeow.C
 
 	for i, result := range results {
 		if err := sendDownloadResult(ctx, c, msg, result, i == 0); err != nil {
-			logutil.LoggerFromContext(ctx).Error("Downloader send error", "error", err)
+			logutil.Error(ctx, "Downloader send error", "error", err)
 			helper.SendTextMessage(ctx, c, msg.From, "Failed to send media", nil)
 			return
 		}

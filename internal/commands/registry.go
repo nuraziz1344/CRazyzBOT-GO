@@ -87,8 +87,7 @@ func (r *Registry) Handle(ctx context.Context, c *whatsmeow.Client, msg *dto.Par
 		r.mu.RUnlock()
 
 		if ok {
-			logger := logutil.LoggerFromContext(ctx)
-			logger.Info("Executing command",
+			logutil.Info(ctx, "Executing command",
 				"command", cmdName,
 				"args", args,
 				"from", msg.From.String(),
