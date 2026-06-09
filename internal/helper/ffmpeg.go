@@ -29,6 +29,7 @@ func GenerateFfmpegArgs(input, output string, isAnimated bool) []string {
 			"-vf",
 			"scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0.0",
 			"-quality", "75",
+			"-pix_fmt", "yuva420p",
 			"-v", "error",
 			output,
 		}
@@ -83,6 +84,7 @@ func GenerateFfmpegArgsWithBitrate(input, output string, isAnimated bool, durati
 			"-vf",
 			"scale=512:512:force_original_aspect_ratio=decrease:flags=lanczos,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0.0",
 			"-quality", "50",
+			"-pix_fmt", "yuva420p",
 			"-v", "error",
 			output,
 		}
