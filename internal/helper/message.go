@@ -12,6 +12,18 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// GetSenderPhone resolves the real phone number from a MessageInfo.
+// When the sender is a LID (@lid), it uses SenderAlt (which contains the phone number JID).
+// Otherwise it returns the regular sender's user portion.
+func GetSenderPhone(info types.MessageInfo) string {
+	if info.Sender.Server == types.HiddenUserServer || info.Sender.Server == types.HostedLIDServer {
+		if !info.SenderAlt.IsEmpty() {
+			return info.SenderAlt.ToNonAD().User
+		}
+	}
+	return info.Sender.ToNonAD().User
+}
+
 func GenerateReplyContextInfo(quoted *dto.Quoted) *waE2E.ContextInfo {
 	if quoted.QuotedMessage == nil {
 		return nil

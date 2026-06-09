@@ -50,11 +50,10 @@ func (h *BotHandler) handleMessage(msg *events.Message) {
 
 	logger := logutil.LoggerFromContext(ctx)
 	logger.Info("Incoming message",
-		"msgID", msg.Info.ID,
-		"from", msg.Info.Chat.String(),
+		"msgID", parsedMsg.StanzaID,
+		"from", parsedMsg.Body,
 		"sender", parsedMsg.Phone,
-		"senderJID", msg.Info.Sender.String(),
-		"pushName", msg.Info.PushName,
+		"pushName", parsedMsg.PushName,
 	)
 
 	h.client.MarkRead(context.Background(), []types.MessageID{types.MessageID(msg.Info.ID)}, time.Now(), msg.Info.Chat, msg.Info.Sender)
@@ -66,7 +65,7 @@ func parseMessage(client *whatsmeow.Client, msg *events.Message) (*dto.ParsedMsg
 		return nil, false
 	}
 
-	sender := helper.GetSenderNumber(msg.Info.Sender.String())
+	sender := helper.GetSenderPhone(msg.Info)
 	pushName := msg.Info.PushName
 	message := msg.Message
 	var body string
