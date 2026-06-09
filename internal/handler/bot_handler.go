@@ -50,7 +50,7 @@ func (h *BotHandler) handleMessage(msg *events.Message) {
 
 	logutil.Info(ctx, "Incoming message",
 		"msgID", parsedMsg.StanzaID,
-		"from", parsedMsg.Body,
+		"from", parsedMsg.From,
 		"sender", parsedMsg.Phone,
 		"pushName", parsedMsg.PushName,
 	)
