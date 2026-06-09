@@ -12,25 +12,21 @@ import (
 )
 
 // HandleEarthquakeSubscribe handles the /earthquakesubscribe command
-func HandleEarthquakeSubscribe(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
-	ctx := context.Background()
-
+func HandleEarthquakeSubscribe(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	if err := store.SetEarthquakeSubscription(ctx, msg.From.String(), true); err != nil {
-		helper.SendTextMessage(c, msg.From, fmt.Sprintf("Failed to subscribe: %v", err), nil)
+		helper.SendTextMessage(ctx, c, msg.From, fmt.Sprintf("Failed to subscribe: %v", err), nil)
 		return
 	}
 
-	helper.SendTextMessage(c, msg.From, "✅ Subscribed to earthquake notifications (magnitude > 4.0)", nil)
+	helper.SendTextMessage(ctx, c, msg.From, "✅ Subscribed to earthquake notifications (magnitude > 4.0)", nil)
 }
 
 // HandleEarthquakeUnsubscribe handles the /earthquakeunsubscribe command
-func HandleEarthquakeUnsubscribe(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
-	ctx := context.Background()
-
+func HandleEarthquakeUnsubscribe(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	if err := store.SetEarthquakeSubscription(ctx, msg.From.String(), false); err != nil {
-		helper.SendTextMessage(c, msg.From, fmt.Sprintf("Failed to unsubscribe: %v", err), nil)
+		helper.SendTextMessage(ctx, c, msg.From, fmt.Sprintf("Failed to unsubscribe: %v", err), nil)
 		return
 	}
 
-	helper.SendTextMessage(c, msg.From, "✅ Unsubscribed from earthquake notifications", nil)
+	helper.SendTextMessage(ctx, c, msg.From, "✅ Unsubscribed from earthquake notifications", nil)
 }

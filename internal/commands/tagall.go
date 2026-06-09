@@ -12,9 +12,9 @@ import (
 	"go.mau.fi/whatsmeow/proto/waE2E"
 )
 
-func HandleTagAll(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func HandleTagAll(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	if !msg.IsGroup {
-		helper.SendTextMessage(c, msg.From, "This command can only be used in groups.", nil)
+		helper.SendTextMessage(ctx, c, msg.From, "This command can only be used in groups.", nil)
 		return
 	}
 
@@ -51,7 +51,7 @@ func HandleTagAll(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store st
 	}
 
 	contextInfo.MentionedJID = mentionedJIDs
-	c.SendMessage(context.Background(), msg.From, &waE2E.Message{
+	c.SendMessage(ctx, msg.From, &waE2E.Message{
 		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
 			Text:        &message,
 			ContextInfo: contextInfo,

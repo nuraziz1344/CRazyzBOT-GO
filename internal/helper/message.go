@@ -2,9 +2,9 @@ package helper
 
 import (
 	"context"
-	"log"
 
 	"crazyzbot-go/internal/dto"
+	"crazyzbot-go/internal/logutil"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -24,8 +24,9 @@ func GenerateReplyContextInfo(quoted *dto.Quoted) *waE2E.ContextInfo {
 	}
 }
 
-func SendTextMessage(c *whatsmeow.Client, JID types.JID, text string, quoted *dto.Quoted) {
+func SendTextMessage(ctx context.Context, c *whatsmeow.Client, JID types.JID, text string, quoted *dto.Quoted) {
 	var err error
+	logger := logutil.LoggerFromContext(ctx)
 
 	if quoted != nil {
 		m := &waE2E.Message{
@@ -40,12 +41,13 @@ func SendTextMessage(c *whatsmeow.Client, JID types.JID, text string, quoted *dt
 	}
 
 	if err != nil {
-		log.Println("Error sending message:", err)
+		logger.Error("Error sending message", "error", err, "to", JID.String())
 	}
 }
 
-func SendStickerMessage(c *whatsmeow.Client, from types.JID, media *[]byte, isAnimated bool, quoted *dto.Quoted) error {
+func SendStickerMessage(ctx context.Context, c *whatsmeow.Client, from types.JID, media *[]byte, isAnimated bool, quoted *dto.Quoted) error {
 	var err error
+	logger := logutil.LoggerFromContext(ctx)
 
 	res, err := c.Upload(context.Background(), *media, whatsmeow.MediaImage)
 	if err != nil {
@@ -69,14 +71,15 @@ func SendStickerMessage(c *whatsmeow.Client, from types.JID, media *[]byte, isAn
 	_, err = c.SendMessage(context.Background(), from, &waE2E.Message{StickerMessage: stickerMessage})
 
 	if err != nil {
-		log.Println("Error sending message:", err)
+		logger.Error("Error sending sticker message", "error", err, "to", from.String())
 	}
 
 	return nil
 }
 
-func SendImageMessage(c *whatsmeow.Client, from types.JID, media *[]byte, quoted *dto.Quoted) error {
+func SendImageMessage(ctx context.Context, c *whatsmeow.Client, from types.JID, media *[]byte, quoted *dto.Quoted) error {
 	var err error
+	logger := logutil.LoggerFromContext(ctx)
 
 	res, err := c.Upload(context.Background(), *media, whatsmeow.MediaImage)
 	if err != nil {
@@ -99,14 +102,15 @@ func SendImageMessage(c *whatsmeow.Client, from types.JID, media *[]byte, quoted
 	_, err = c.SendMessage(context.Background(), from, &waE2E.Message{ImageMessage: imageMessage})
 
 	if err != nil {
-		log.Println("Error sending message:", err)
+		logger.Error("Error sending image message", "error", err, "to", from.String())
 	}
 
 	return nil
 }
 
-func SendImageMessageWithCaption(c *whatsmeow.Client, from types.JID, media *[]byte, caption string, quoted *dto.Quoted) error {
+func SendImageMessageWithCaption(ctx context.Context, c *whatsmeow.Client, from types.JID, media *[]byte, caption string, quoted *dto.Quoted) error {
 	var err error
+	logger := logutil.LoggerFromContext(ctx)
 
 	res, err := c.Upload(context.Background(), *media, whatsmeow.MediaImage)
 	if err != nil {
@@ -133,14 +137,15 @@ func SendImageMessageWithCaption(c *whatsmeow.Client, from types.JID, media *[]b
 	_, err = c.SendMessage(context.Background(), from, &waE2E.Message{ImageMessage: imageMessage})
 
 	if err != nil {
-		log.Println("Error sending message:", err)
+		logger.Error("Error sending image with caption", "error", err, "to", from.String())
 	}
 
 	return nil
 }
 
-func SendGifMessage(c *whatsmeow.Client, from types.JID, media *[]byte, quoted *dto.Quoted) error {
+func SendGifMessage(ctx context.Context, c *whatsmeow.Client, from types.JID, media *[]byte, quoted *dto.Quoted) error {
 	var err error
+	logger := logutil.LoggerFromContext(ctx)
 
 	res, err := c.Upload(context.Background(), *media, whatsmeow.MediaVideo)
 	if err != nil {
@@ -164,13 +169,15 @@ func SendGifMessage(c *whatsmeow.Client, from types.JID, media *[]byte, quoted *
 	_, err = c.SendMessage(context.Background(), from, &waE2E.Message{VideoMessage: videoMessage})
 
 	if err != nil {
-		log.Println("Error sending message:", err)
+		logger.Error("Error sending GIF message", "error", err, "to", from.String())
 	}
 
 	return nil
 }
 
-func SendVideoMessage(c *whatsmeow.Client, from types.JID, media *[]byte, caption string, quoted *dto.Quoted) error {
+func SendVideoMessage(ctx context.Context, c *whatsmeow.Client, from types.JID, media *[]byte, caption string, quoted *dto.Quoted) error {
+	logger := logutil.LoggerFromContext(ctx)
+
 	res, err := c.Upload(context.Background(), *media, whatsmeow.MediaVideo)
 	if err != nil {
 		return err
@@ -196,13 +203,15 @@ func SendVideoMessage(c *whatsmeow.Client, from types.JID, media *[]byte, captio
 
 	_, err = c.SendMessage(context.Background(), from, &waE2E.Message{VideoMessage: videoMessage})
 	if err != nil {
-		log.Println("Error sending message:", err)
+		logger.Error("Error sending video message", "error", err, "to", from.String())
 	}
 
 	return err
 }
 
-func SendAudioMessage(c *whatsmeow.Client, from types.JID, media *[]byte, mimeType string, filename string, quoted *dto.Quoted) error {
+func SendAudioMessage(ctx context.Context, c *whatsmeow.Client, from types.JID, media *[]byte, mimeType string, filename string, quoted *dto.Quoted) error {
+	logger := logutil.LoggerFromContext(ctx)
+
 	if mimeType == "" {
 		mimeType = "audio/mpeg"
 	}
@@ -229,13 +238,15 @@ func SendAudioMessage(c *whatsmeow.Client, from types.JID, media *[]byte, mimeTy
 
 	_, err = c.SendMessage(context.Background(), from, &waE2E.Message{AudioMessage: audioMessage})
 	if err != nil {
-		log.Println("Error sending message:", err)
+		logger.Error("Error sending audio message", "error", err, "to", from.String())
 	}
 
 	return err
 }
 
-func SendDocumentMessage(c *whatsmeow.Client, from types.JID, media *[]byte, mimeType string, filename string, caption string, quoted *dto.Quoted) error {
+func SendDocumentMessage(ctx context.Context, c *whatsmeow.Client, from types.JID, media *[]byte, mimeType string, filename string, caption string, quoted *dto.Quoted) error {
+	logger := logutil.LoggerFromContext(ctx)
+
 	if mimeType == "" {
 		mimeType = "application/octet-stream"
 	}
@@ -270,7 +281,7 @@ func SendDocumentMessage(c *whatsmeow.Client, from types.JID, media *[]byte, mim
 
 	_, err = c.SendMessage(context.Background(), from, &waE2E.Message{DocumentMessage: documentMessage})
 	if err != nil {
-		log.Println("Error sending message:", err)
+		logger.Error("Error sending document message", "error", err, "to", from.String())
 	}
 
 	return err

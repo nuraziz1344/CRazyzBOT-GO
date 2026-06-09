@@ -25,7 +25,7 @@ func NewGameHandler(mcService services.MinecraftProvider) *GameHandler {
 	}
 }
 
-func (h *GameHandler) HandleMinecraft(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func (h *GameHandler) HandleMinecraft(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	if args == "" {
 		// Default check for authorized groups
 		authorized := false
@@ -49,37 +49,37 @@ func (h *GameHandler) HandleMinecraft(c *whatsmeow.Client, msg *dto.ParsedMsg, a
 		}
 
 		if authorized {
-			status, err := h.mcService.GetServerTapStatus(context.Background())
+			status, err := h.mcService.GetServerTapStatus(ctx)
 			if err != nil {
-				helper.SendTextMessage(c, msg.From, "Failed to fetch default server status: "+err.Error(), nil)
+				helper.SendTextMessage(ctx, c, msg.From, "Failed to fetch default server status: "+err.Error(), nil)
 				return
 			}
-			h.sendMinecraftStatus(c, msg.From, "Private Server", status)
+			h.sendMinecraftStatus(ctx, c, msg.From, "Private Server", status)
 			return
 		}
 
-		helper.SendTextMessage(c, msg.From, "Please provide a server IP.\nExample: /mc mc.hypixel.net", nil)
+		helper.SendTextMessage(ctx, c, msg.From, "Please provide a server IP.\nExample: /mc mc.hypixel.net", nil)
 		return
 	}
 
 	parts := strings.Split(args, " ")
 	ip := parts[0]
 
-	status, err := h.mcService.GetStatus(context.Background(), ip)
+	status, err := h.mcService.GetStatus(ctx, ip)
 	if err != nil {
-		helper.SendTextMessage(c, msg.From, "Failed to get server status", nil)
+		helper.SendTextMessage(ctx, c, msg.From, "Failed to get server status", nil)
 		return
 	}
 
 	if !status.Online {
-		helper.SendTextMessage(c, msg.From, fmt.Sprintf("Server %s is offline", ip), nil)
+		helper.SendTextMessage(ctx, c, msg.From, fmt.Sprintf("Server %s is offline", ip), nil)
 		return
 	}
 
-	h.sendMinecraftStatus(c, msg.From, ip, status)
+	h.sendMinecraftStatus(ctx, c, msg.From, ip, status)
 }
 
-func (h *GameHandler) sendMinecraftStatus(c *whatsmeow.Client, jid types.JID, name string, status *services.MinecraftStatus) {
+func (h *GameHandler) sendMinecraftStatus(ctx context.Context, c *whatsmeow.Client, jid types.JID, name string, status *services.MinecraftStatus) {
 	res := fmt.Sprintf("Server Status: %s\n", name)
 	res += fmt.Sprintf("Version: %s\n", status.Version)
 	res += fmt.Sprintf("Players: %d/%d\n", status.PlayersOnline, status.PlayersMax)
@@ -93,5 +93,5 @@ func (h *GameHandler) sendMinecraftStatus(c *whatsmeow.Client, jid types.JID, na
 		res += fmt.Sprintf("Online Players:\n- %s\n", strings.Join(status.Players, "\n- "))
 	}
 
-	helper.SendTextMessage(c, jid, res, nil)
+	helper.SendTextMessage(ctx, c, jid, res, nil)
 }

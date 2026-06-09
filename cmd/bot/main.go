@@ -17,6 +17,7 @@ import (
 	"crazyzbot-go/internal/commands"
 	"crazyzbot-go/internal/config"
 	"crazyzbot-go/internal/handler"
+	"crazyzbot-go/internal/logutil"
 	"crazyzbot-go/internal/services/downloader"
 	"crazyzbot-go/internal/services/earthquake"
 	"crazyzbot-go/internal/services/minecraft"
@@ -26,12 +27,11 @@ import (
 )
 
 func main() {
+	cfg := config.LoadConfig()
+	logutil.InitJSONLogger(cfg.LogLevel)
+
 	log.Println("Starting BOT...")
 
-	// delete all media on data/tmp
-	// exec.Command("rm", "data/tmp/*.{png,gif,mp4,webp}")
-
-	cfg := config.LoadConfig()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

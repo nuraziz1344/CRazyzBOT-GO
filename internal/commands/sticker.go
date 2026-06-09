@@ -7,7 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -15,6 +15,7 @@ import (
 
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/logutil"
 	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
@@ -22,30 +23,31 @@ import (
 
 const maxStickerSize = 1024 * 1024 // 1MB
 
-func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, store storage.SubscriptionStore) {
+func HandleSticker(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, store storage.SubscriptionStore) {
+	logger := logutil.LoggerFromContext(ctx)
 	media, mediaType, ok := resolveStickerMedia(msg)
 	if !ok {
-		log.Println("No media found for sticker generation")
+		logger.Warn("No media found for sticker generation")
 		return
 	}
 
-	res, err := c.Download(context.Background(), *media)
+	res, err := c.Download(ctx, *media)
 	if err != nil {
-		log.Println("Error downloading media:", err)
+		logger.Error("Error downloading media", "error", err)
 		return
 	}
 
 	ext, isAnimated := detectStickerInput(mediaType, res)
 	inputPath, err := writeStickerInput(res, ext)
 	if err != nil {
-		log.Println("Error preparing sticker input:", err)
+		logger.Error("Error preparing sticker input", "error", err)
 		return
 	}
 	defer os.Remove(inputPath)
 
 	res, err = runStickerFFmpeg(inputPath, isAnimated, packName, false)
 	if err != nil {
-		log.Println("Error generating sticker:", err)
+		logger.Error("Error generating sticker", "error", err)
 		return
 	}
 
@@ -53,7 +55,7 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, sto
 	if len(res) > maxStickerSize {
 		sizeMB := float64(len(res)) / (1024 * 1024)
 		helpMsg := fmt.Sprintf("Sticker too large (%.2f MB). Try using /sticker2 for better compression.", sizeMB)
-		helper.SendTextMessage(c, msg.From, helpMsg, &dto.Quoted{
+		helper.SendTextMessage(ctx, c, msg.From, helpMsg, &dto.Quoted{
 			QuotedMessage: msg.QuotedMessage,
 			StanzaID:      &msg.StanzaID,
 			Participant:   &msg.Participant,
@@ -61,43 +63,44 @@ func HandleSticker(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, sto
 		return
 	}
 
-	err = helper.SendStickerMessage(c, msg.From, &res, isAnimated, buildQuotedMessage(msg))
+	err = helper.SendStickerMessage(ctx, c, msg.From, &res, isAnimated, buildQuotedMessage(msg))
 	if err != nil {
-		log.Println("Error sending sticker message:", err)
+		logger.Error("Error sending sticker message", "error", err)
 		return
 	}
 }
 
-func HandleSticker2(c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, store storage.SubscriptionStore) {
+func HandleSticker2(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, store storage.SubscriptionStore) {
+	logger := logutil.LoggerFromContext(ctx)
 	media, mediaType, ok := resolveStickerMedia(msg)
 	if !ok {
-		log.Println("No media found for sticker generation")
+		logger.Warn("No media found for sticker generation")
 		return
 	}
 
-	res, err := c.Download(context.Background(), *media)
+	res, err := c.Download(ctx, *media)
 	if err != nil {
-		log.Println("Error downloading media:", err)
+		logger.Error("Error downloading media", "error", err)
 		return
 	}
 
 	ext, isAnimated := detectStickerInput(mediaType, res)
 	inputPath, err := writeStickerInput(res, ext)
 	if err != nil {
-		log.Println("Error preparing sticker input:", err)
+		logger.Error("Error preparing sticker input", "error", err)
 		return
 	}
 	defer os.Remove(inputPath)
 
 	res, err = runStickerFFmpeg(inputPath, isAnimated, packName, true)
 	if err != nil {
-		log.Println("Error generating sticker with bitrate:", err)
+		logger.Error("Error generating sticker with bitrate", "error", err)
 		return
 	}
 
-	err = helper.SendStickerMessage(c, msg.From, &res, isAnimated, buildQuotedMessage(msg))
+	err = helper.SendStickerMessage(ctx, c, msg.From, &res, isAnimated, buildQuotedMessage(msg))
 	if err != nil {
-		log.Println("Error sending sticker message:", err)
+		logger.Error("Error sending sticker message", "error", err)
 		return
 	}
 }
@@ -190,7 +193,7 @@ func runStickerFFmpeg(inputPath string, isAnimated bool, packName string, useBit
 
 	res, err = addStickerMetadata(res, resolveStickerPackName(packName), resolveStickerAuthor())
 	if err != nil {
-		log.Println("Warning: failed to add sticker metadata:", err)
+		slog.Warn("Failed to add sticker metadata", "error", err)
 	}
 
 	return res, nil

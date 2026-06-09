@@ -3,7 +3,6 @@ package prayer
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/logutil"
 	"crazyzbot-go/internal/services"
 	"crazyzbot-go/internal/storage"
 
@@ -24,12 +24,14 @@ type prayerTime struct {
 }
 
 func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Service, store storage.SubscriptionStore) {
+	logger := logutil.LoggerFromContext(ctx)
+
 	go func() {
 		for {
 			// Get all prayer subscriptions
 			prayerSubs, err := store.ListPrayerSubscriptions(ctx)
 			if err != nil {
-				log.Printf("Prayer scheduler: failed to get prayer subscriptions: %v", err)
+				logger.Error("Prayer scheduler: failed to get prayer subscriptions", "error", err)
 				if !sleepOrDone(ctx, 5*time.Minute) {
 					return
 				}
@@ -37,7 +39,6 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 			}
 
 			if len(prayerSubs) == 0 {
-				// log.Println("Prayer scheduler: no prayer subscriptions found")
 				if !sleepOrDone(ctx, 5*time.Minute) {
 					return
 				}
@@ -48,7 +49,7 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 			for jidStr, cityID := range prayerSubs {
 				nextPrayer, err := getNextPrayerForJID(ctx, service, jidStr, cityID)
 				if err != nil {
-					log.Printf("Prayer scheduler error for %s: %v", jidStr, err)
+					logger.Error("Prayer scheduler error", "jid", jidStr, "error", err)
 					continue
 				}
 				if nextPrayer == nil {
@@ -60,7 +61,11 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 					wait = time.Second
 				}
 
-				log.Printf("Prayer scheduler: next %s at %s for %s", nextPrayer.Name, nextPrayer.At.Format(time.RFC3339), jidStr)
+				logger.Info("Prayer scheduler: next prayer",
+					"prayer", nextPrayer.Name,
+					"at", nextPrayer.At.Format(time.RFC3339),
+					"jid", jidStr,
+				)
 
 				if !sleepOrDone(ctx, wait) {
 					return
@@ -68,13 +73,14 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 
 				message := buildPrayerMessage(nextPrayer, "") // City name optional for now
 				jid := types.NewJID(jidStr, "s.whatsapp.net")
-				helper.SendTextMessage(client, jid, message, nil)
+				helper.SendTextMessage(ctx, client, jid, message, nil)
 			}
 		}
 	}()
 }
 
 func resolveCity(ctx context.Context, service *Service) (string, string) {
+	logger := logutil.LoggerFromContext(ctx)
 	cityID := strings.TrimSpace(os.Getenv("PRAYER_CITY_ID"))
 	if cityID != "" {
 		return cityID, strings.TrimSpace(os.Getenv("PRAYER_CITY_NAME"))
@@ -87,7 +93,7 @@ func resolveCity(ctx context.Context, service *Service) (string, string) {
 
 	id, err := service.GetCityID(ctx, cityName)
 	if err != nil {
-		log.Println("Prayer scheduler: failed to resolve city:", err)
+		logger.Error("Prayer scheduler: failed to resolve city", "error", err)
 		return "", ""
 	}
 	return id, cityName
@@ -167,6 +173,7 @@ func buildPrayerTimes(sched *services.PrayerSchedule, date time.Time, loc *time.
 }
 
 func collectPrayerTargets(ctx context.Context, client *whatsmeow.Client) []types.JID {
+	logger := logutil.LoggerFromContext(ctx)
 	targets := make(map[string]types.JID)
 
 	ownerNumber := strings.TrimSpace(os.Getenv("OWNER_NUMBER"))
@@ -182,7 +189,7 @@ func collectPrayerTargets(ctx context.Context, client *whatsmeow.Client) []types
 
 	groups, err := client.GetJoinedGroups(ctx)
 	if err != nil {
-		log.Println("Prayer scheduler: error getting joined groups:", err)
+		logger.Error("Prayer scheduler: error getting joined groups", "error", err)
 		return mapToSlice(targets)
 	}
 

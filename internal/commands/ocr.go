@@ -12,7 +12,7 @@ import (
 	"go.mau.fi/whatsmeow"
 )
 
-func HandleOCR(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func HandleOCR(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	var media *whatsmeow.DownloadableMessage
 
 	if msg.MediaType == dto.MediaImage {
@@ -25,13 +25,13 @@ func HandleOCR(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store stora
 	}
 
 	if media == nil {
-		helper.SendTextMessage(c, msg.From, "Please send/reply to an image with /ocr", nil)
+		helper.SendTextMessage(ctx, c, msg.From, "Please send/reply to an image with /ocr", nil)
 		return
 	}
 
-	data, err := c.Download(context.Background(), *media)
+	data, err := c.Download(ctx, *media)
 	if err != nil {
-		helper.SendTextMessage(c, msg.From, "Failed to download image", nil)
+		helper.SendTextMessage(ctx, c, msg.From, "Failed to download image", nil)
 		return
 	}
 
@@ -39,14 +39,14 @@ func HandleOCR(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store stora
 	tempFile := helper.Temp(".jpg")
 	err = os.WriteFile(tempFile, data, 0644)
 	if err != nil {
-		helper.SendTextMessage(c, msg.From, "Failed to save temp file", nil)
+		helper.SendTextMessage(ctx, c, msg.From, "Failed to save temp file", nil)
 		return
 	}
 	defer os.Remove(tempFile)
 
 	text, err := ocr.Recognize(tempFile)
 	if err != nil {
-		helper.SendTextMessage(c, msg.From, "OCR Failed: "+err.Error(), nil)
+		helper.SendTextMessage(ctx, c, msg.From, "OCR Failed: "+err.Error(), nil)
 		return
 	}
 
@@ -54,5 +54,5 @@ func HandleOCR(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store stora
 		text = "No text detected."
 	}
 
-	helper.SendTextMessage(c, msg.From, text, nil)
+	helper.SendTextMessage(ctx, c, msg.From, text, nil)
 }

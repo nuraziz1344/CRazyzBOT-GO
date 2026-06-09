@@ -2,13 +2,13 @@ package commands
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
 
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/logutil"
 	"crazyzbot-go/internal/storage"
 
 	"go.mau.fi/whatsmeow"
@@ -28,10 +28,11 @@ func getSticker(msg *dto.ParsedMsg) (media *whatsmeow.DownloadableMessage) {
 	return nil
 }
 
-func HandleToImg(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func HandleToImg(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	logger := logutil.LoggerFromContext(ctx)
 	sticker := getSticker(msg)
 	if sticker == nil {
-		helper.SendTextMessage(c, msg.From, "Please send a sticker or reply to a sticker with this command.", &dto.Quoted{
+		helper.SendTextMessage(ctx, c, msg.From, "Please send a sticker or reply to a sticker with this command.", &dto.Quoted{
 			QuotedMessage: msg.Message,
 			StanzaID:      &msg.StanzaID,
 			Participant:   &msg.Participant,
@@ -39,10 +40,10 @@ func HandleToImg(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store sto
 		return
 	}
 
-	bytes, err := c.Download(context.Background(), *sticker)
+	bytes, err := c.Download(ctx, *sticker)
 	if err != nil {
-		helper.SendTextMessage(c, msg.From, "Failed to download sticker.", nil)
-		log.Printf("Failed to download sticker: %v\n", err)
+		helper.SendTextMessage(ctx, c, msg.From, "Failed to download sticker.", nil)
+		logger.Error("Failed to download sticker", "error", err)
 		return
 	}
 
@@ -55,19 +56,19 @@ func HandleToImg(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store sto
 	}
 
 	if err != nil {
-		helper.SendTextMessage(c, msg.From, "Failed to convert sticker.", nil)
-		log.Printf("Failed to convert sticker: %v\n", err)
+		helper.SendTextMessage(ctx, c, msg.From, "Failed to convert sticker.", nil)
+		logger.Error("Failed to convert sticker", "error", err)
 		return
 	}
 
 	if animated {
-		err = helper.SendGifMessage(c, msg.From, &out, &dto.Quoted{
+		err = helper.SendGifMessage(ctx, c, msg.From, &out, &dto.Quoted{
 			QuotedMessage: msg.Message,
 			StanzaID:      &msg.StanzaID,
 			Participant:   &msg.Participant,
 		})
 	} else {
-		err = helper.SendImageMessage(c, msg.From, &out, &dto.Quoted{
+		err = helper.SendImageMessage(ctx, c, msg.From, &out, &dto.Quoted{
 			QuotedMessage: msg.Message,
 			StanzaID:      &msg.StanzaID,
 			Participant:   &msg.Participant,
@@ -75,7 +76,7 @@ func HandleToImg(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store sto
 	}
 
 	if err != nil {
-		log.Printf("Failed to send image: %v\n", err)
+		logger.Error("Failed to send image", "error", err)
 	}
 }
 

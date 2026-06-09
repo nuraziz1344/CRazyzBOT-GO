@@ -2,7 +2,7 @@ package handler
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -10,6 +10,7 @@ import (
 	"crazyzbot-go/internal/config"
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
+	"crazyzbot-go/internal/logutil"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -34,7 +35,7 @@ func (h *BotHandler) EventHandler(evt any) {
 	case *events.Message:
 		h.handleMessage(v)
 	case *events.Connected:
-		log.Println("BOT Connected!")
+		slog.Info("BOT Connected!")
 	}
 }
 
@@ -44,8 +45,19 @@ func (h *BotHandler) handleMessage(msg *events.Message) {
 		return
 	}
 
+	// Inject logID and request-scoped logger into context for traceability
+	ctx := logutil.WithLogID(context.Background())
+
+	logger := logutil.LoggerFromContext(ctx)
+	logger.Info("Incoming message",
+		"cmd", msg.Info.ID,
+		"from", msg.Info.Chat.String(),
+		"sender", msg.Info.Sender.String(),
+		"pushName", msg.Info.PushName,
+	)
+
 	h.client.MarkRead(context.Background(), []types.MessageID{types.MessageID(msg.Info.ID)}, time.Now(), msg.Info.Chat, msg.Info.Sender)
-	h.registry.Handle(h.client, parsedMsg)
+	h.registry.Handle(ctx, h.client, parsedMsg)
 }
 
 func parseMessage(client *whatsmeow.Client, msg *events.Message) (*dto.ParsedMsg, bool) {
@@ -68,7 +80,7 @@ func parseMessage(client *whatsmeow.Client, msg *events.Message) (*dto.ParsedMsg
 	if strings.Contains(msg.Info.Chat.String(), "@g.us") {
 		info, err := client.GetGroupInfo(context.Background(), msg.Info.Chat)
 		if err != nil {
-			log.Println("Error getting group info:", err)
+			slog.Warn("Error getting group info", "error", err, "chat", msg.Info.Chat.String())
 			return nil, false
 		}
 		groupInfo = info

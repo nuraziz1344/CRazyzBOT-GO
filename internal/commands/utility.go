@@ -23,19 +23,19 @@ func NewUtilityHandler(shippingService services.ShippingProvider) *UtilityHandle
 	}
 }
 
-func (h *UtilityHandler) HandleResi(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func (h *UtilityHandler) HandleResi(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	parts := strings.Split(args, " ")
 	if len(parts) < 2 {
-		helper.SendTextMessage(c, msg.From, "Usage: /cekresi <courier> <awb>", nil)
+		helper.SendTextMessage(ctx, c, msg.From, "Usage: /cekresi <courier> <awb>", nil)
 		return
 	}
 
 	courier := parts[0]
 	awb := parts[1]
 
-	res, err := h.shippingService.CheckResi(context.Background(), courier, awb)
+	res, err := h.shippingService.CheckResi(ctx, courier, awb)
 	if err != nil {
-		helper.SendTextMessage(c, msg.From, "Error: "+err.Error(), nil)
+		helper.SendTextMessage(ctx, c, msg.From, "Error: "+err.Error(), nil)
 		return
 	}
 
@@ -46,5 +46,5 @@ func (h *UtilityHandler) HandleResi(c *whatsmeow.Client, msg *dto.ParsedMsg, arg
 		reply += fmt.Sprintf("- %s: %s\n", h.Date, h.Description)
 	}
 
-	helper.SendTextMessage(c, msg.From, reply, nil)
+	helper.SendTextMessage(ctx, c, msg.From, reply, nil)
 }

@@ -23,29 +23,27 @@ func NewReligionHandler(prayerService services.PrayerProvider) *ReligionHandler 
 	}
 }
 
-func (h *ReligionHandler) HandlePrayer(c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func (h *ReligionHandler) HandlePrayer(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
 	if args == "" {
-		helper.SendTextMessage(c, msg.From, "Usage: /sholat <city name> or /sholat listkota <keyword>", nil)
+		helper.SendTextMessage(ctx, c, msg.From, "Usage: /sholat <city name> or /sholat listkota <keyword>", nil)
 		return
 	}
-
-	ctx := context.Background()
 
 	if strings.HasPrefix(strings.ToLower(args), "listkota") {
 		keyword := strings.TrimSpace(strings.TrimPrefix(args, "listkota"))
 		if keyword == "" {
-			helper.SendTextMessage(c, msg.From, "Please provide a keyword to search city", nil)
+			helper.SendTextMessage(ctx, c, msg.From, "Please provide a keyword to search city", nil)
 			return
 		}
 
 		cities, err := h.prayerService.SearchCity(ctx, keyword)
 		if err != nil {
-			helper.SendTextMessage(c, msg.From, "Error searching city", nil)
+			helper.SendTextMessage(ctx, c, msg.From, "Error searching city", nil)
 			return
 		}
 
 		if len(cities) == 0 {
-			helper.SendTextMessage(c, msg.From, "City not found", nil)
+			helper.SendTextMessage(ctx, c, msg.From, "City not found", nil)
 			return
 		}
 
@@ -53,7 +51,7 @@ func (h *ReligionHandler) HandlePrayer(c *whatsmeow.Client, msg *dto.ParsedMsg, 
 		for _, city := range cities {
 			res += fmt.Sprintf("- %s (ID: %s)\n", city.Lokasi, city.ID)
 		}
-		helper.SendTextMessage(c, msg.From, res, nil)
+		helper.SendTextMessage(ctx, c, msg.From, res, nil)
 		return
 	}
 
@@ -61,23 +59,23 @@ func (h *ReligionHandler) HandlePrayer(c *whatsmeow.Client, msg *dto.ParsedMsg, 
 	// But first try as keyword
 	cities, err := h.prayerService.SearchCity(ctx, args)
 	if err != nil || len(cities) == 0 {
-		helper.SendTextMessage(c, msg.From, "City not found", nil)
+		helper.SendTextMessage(ctx, c, msg.From, "City not found", nil)
 		return
 	}
 
 	schedule, err := h.prayerService.GetSchedule(ctx, cities[0].ID)
 	if err != nil {
-		helper.SendTextMessage(c, msg.From, "Error getting schedule", nil)
+		helper.SendTextMessage(ctx, c, msg.From, "Error getting schedule", nil)
 		return
 	}
 
 	res := fmt.Sprintf("Jadwal Sholat %s\nTanggal: %s\n\n", cities[0].Lokasi, schedule.Date)
-	res += fmt.Sprintf("Imsak: %s\n", schedule.Imsak) // Wait, I need to check field names in PrayerSchedule struct
+	res += fmt.Sprintf("Imsak: %s\n", schedule.Imsak)
 	res += fmt.Sprintf("Subuh: %s\n", schedule.Fajr)
 	res += fmt.Sprintf("Dzuhur: %s\n", schedule.Dhuhr)
 	res += fmt.Sprintf("Ashar: %s\n", schedule.Asr)
 	res += fmt.Sprintf("Maghrib: %s\n", schedule.Maghrib)
 	res += fmt.Sprintf("Isya: %s", schedule.Isha)
 
-	helper.SendTextMessage(c, msg.From, res, nil)
+	helper.SendTextMessage(ctx, c, msg.From, res, nil)
 }
