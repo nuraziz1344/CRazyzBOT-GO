@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"crazyzbot-go/internal/helper"
@@ -23,8 +24,40 @@ type prayerTime struct {
 	At   time.Time
 }
 
+// cityIDCache resolves and caches city name → numeric ID mappings.
+type cityIDCache struct {
+	mu      sync.RWMutex
+	entries map[string]string // cityName -> numericID
+}
+
+func (c *cityIDCache) resolve(ctx context.Context, service *Service, nameOrID string) (string, error) {
+	// If it's already a numeric ID, use it directly
+	if _, err := strconv.Atoi(nameOrID); err == nil {
+		return nameOrID, nil
+	}
+
+	c.mu.RLock()
+	id, ok := c.entries[nameOrID]
+	c.mu.RUnlock()
+	if ok {
+		return id, nil
+	}
+
+	id, err := service.GetCityID(ctx, nameOrID)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve city %q: %w", nameOrID, err)
+	}
+
+	c.mu.Lock()
+	c.entries[nameOrID] = id
+	c.mu.Unlock()
+
+	return id, nil
+}
+
 func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Service, store storage.SubscriptionStore) {
 	logger := logutil.LoggerFromContext(ctx)
+	cache := &cityIDCache{entries: make(map[string]string)}
 
 	go func() {
 		for {
@@ -46,7 +79,13 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 			}
 
 			// Check each subscribed user's prayer time
-			for jidStr, cityID := range prayerSubs {
+			for jidStr, rawCity := range prayerSubs {
+				cityID, err := cache.resolve(ctx, service, rawCity)
+				if err != nil {
+					logger.Error("Prayer scheduler error", "jid", jidStr, "city", rawCity, "error", err)
+					continue
+				}
+
 				nextPrayer, err := getNextPrayerForJID(ctx, service, jidStr, cityID)
 				if err != nil {
 					logger.Error("Prayer scheduler error", "jid", jidStr, "error", err)
@@ -71,7 +110,7 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 					return
 				}
 
-				message := buildPrayerMessage(nextPrayer, "") // City name optional for now
+				message := buildPrayerMessage(nextPrayer, "")
 				jid := types.NewJID(jidStr, "s.whatsapp.net")
 				helper.SendTextMessage(ctx, client, jid, message, nil)
 			}
