@@ -50,9 +50,10 @@ func (h *BotHandler) handleMessage(msg *events.Message) {
 
 	logger := logutil.LoggerFromContext(ctx)
 	logger.Info("Incoming message",
-		"cmd", msg.Info.ID,
+		"msgID", msg.Info.ID,
 		"from", msg.Info.Chat.String(),
-		"sender", msg.Info.Sender.String(),
+		"sender", parsedMsg.Phone,
+		"senderJID", msg.Info.Sender.String(),
 		"pushName", msg.Info.PushName,
 	)
 
