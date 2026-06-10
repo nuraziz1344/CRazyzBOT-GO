@@ -21,13 +21,11 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-      - name: Configure SSH known hosts (from secret)
-        if: ${{ secrets.SSH_KNOWN_HOSTS != '' }}
-        run: |
-          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      # - name: Configure SSH known hosts (from secret)
+      #   run: |
+      #     echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
 
       - name: Set up known hosts (dynamic keyscan fallback)
-        if: ${{ secrets.SSH_KNOWN_HOSTS == '' }}
         run: |
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
