@@ -4,12 +4,26 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 )
 
 // contextKey is a private type to avoid context key collisions.
 type contextKey string
+
+var projectRoot string
+
+func init() {
+	_, file, _, ok := runtime.Caller(0)
+	if ok {
+		// We are at internal/logutil/logutil.go — go up 3 dirs to reach project root
+		projectRoot = filepath.Dir(filepath.Dir(filepath.Dir(file)))
+	}
+}
 
 const (
 	// LogIDKey is the context key for the log correlation ID.
@@ -67,6 +81,17 @@ func GetLogID(ctx context.Context) string {
 	return id
 }
 
+// sourceAttr returns the "source" log attribute with the caller's file:line.
+// skip is the number of frames up the stack (0 = caller of sourceAttr).
+func sourceAttr(skip int) (string, string) {
+	_, file, line, ok := runtime.Caller(skip + 1)
+	if !ok {
+		return "source", "unknown"
+	}
+	rel := strings.TrimPrefix(file, projectRoot+string(filepath.Separator))
+	return "source", rel + ":" + strconv.Itoa(line)
+}
+
 // LoggerFromContext extracts the request-scoped logger from context.
 // Falls back to the default slog logger if none is set.
 func LoggerFromContext(ctx context.Context) *slog.Logger {
@@ -82,21 +107,29 @@ func LoggerFromContext(ctx context.Context) *slog.Logger {
 
 // Debug logs at debug level with context-scoped logger.
 func Debug(ctx context.Context, msg string, args ...any) {
+	k, v := sourceAttr(1)
+	args = append([]any{k, v}, args...)
 	LoggerFromContext(ctx).Debug(msg, args...)
 }
 
 // Info logs at info level with context-scoped logger.
 func Info(ctx context.Context, msg string, args ...any) {
+	k, v := sourceAttr(1)
+	args = append([]any{k, v}, args...)
 	LoggerFromContext(ctx).Info(msg, args...)
 }
 
 // Warn logs at warn level with context-scoped logger.
 func Warn(ctx context.Context, msg string, args ...any) {
+	k, v := sourceAttr(1)
+	args = append([]any{k, v}, args...)
 	LoggerFromContext(ctx).Warn(msg, args...)
 }
 
 // Error logs at error level with context-scoped logger.
 func Error(ctx context.Context, msg string, args ...any) {
+	k, v := sourceAttr(1)
+	args = append([]any{k, v}, args...)
 	LoggerFromContext(ctx).Error(msg, args...)
 }
 
