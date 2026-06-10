@@ -51,7 +51,7 @@ func HandleOCR(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, arg
 	text, err := ocr.Recognize(tempFile)
 	if err != nil {
 		logutil.Error(ctx, "OCR recognition failed", "error", err)
-		helper.SendTextMessage(ctx, c, msg.From, "OCR Failed: "+err.Error(), nil)
+		helper.SendTextMessage(ctx, c, msg.From, logutil.UserError(ctx), nil)
 		return
 	}
 

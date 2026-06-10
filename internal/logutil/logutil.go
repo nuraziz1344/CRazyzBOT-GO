@@ -99,3 +99,9 @@ func Warn(ctx context.Context, msg string, args ...any) {
 func Error(ctx context.Context, msg string, args ...any) {
 	LoggerFromContext(ctx).Error(msg, args...)
 }
+
+// UserError returns a user-friendly error message that references the logID.
+// Use this for user-facing responses instead of leaking err.Error() details.
+func UserError(ctx context.Context) string {
+	return "An error occurred. Reference: " + GetLogID(ctx)
+}

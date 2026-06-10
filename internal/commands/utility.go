@@ -38,7 +38,7 @@ func (h *UtilityHandler) HandleResi(ctx context.Context, c *whatsmeow.Client, ms
 	res, err := h.shippingService.CheckResi(ctx, courier, awb)
 	if err != nil {
 		logutil.Error(ctx, "Shipping check failed", "courier", courier, "awb", awb, "error", err)
-		helper.SendTextMessage(ctx, c, msg.From, "Error: "+err.Error(), nil)
+		helper.SendTextMessage(ctx, c, msg.From, logutil.UserError(ctx), nil)
 		return
 	}
 

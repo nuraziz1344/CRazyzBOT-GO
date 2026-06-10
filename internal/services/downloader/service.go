@@ -25,6 +25,8 @@ import (
 
 const (
 	maxDownloadSize = 50 * 1024 * 1024
+	downloadTimeout = 180 * time.Second
+	apiTimeout      = 30 * time.Second
 	userAgent       = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36"
 )
 
@@ -38,12 +40,14 @@ type Metadata struct {
 }
 
 type Service struct {
-	httpClient *http.Client
+	httpClient      *http.Client
+	downloadClient  *http.Client
 }
 
 func NewService() *Service {
 	return &Service{
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		httpClient:      &http.Client{Timeout: apiTimeout},
+		downloadClient:  &http.Client{Timeout: downloadTimeout},
 	}
 }
 
@@ -449,15 +453,36 @@ func (s *Service) resultsFromURLs(ctx context.Context, provider string, mediaTyp
 }
 
 func (s *Service) fetchBytes(ctx context.Context, mediaURL string) ([]byte, string, error) {
-	body, headers, err := s.doRequest(ctx, http.MethodGet, mediaURL, nil, map[string]string{})
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, mediaURL, nil)
 	if err != nil {
 		return nil, "", err
 	}
-	contentType := headers.Get("content-type")
+	req.Header.Set("User-Agent", userAgent)
+
+	res, err := s.downloadClient.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, "", fmt.Errorf("HTTP %d downloading media", res.StatusCode)
+	}
+	if res.ContentLength > maxDownloadSize {
+		return nil, "", fmt.Errorf("media too large to send via WhatsApp")
+	}
+	limited := io.LimitReader(res.Body, maxDownloadSize+1)
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, "", err
+	}
+	if len(data) > maxDownloadSize {
+		return nil, "", fmt.Errorf("media too large to send via WhatsApp")
+	}
+	contentType := res.Header.Get("content-type")
 	if contentType != "" {
 		contentType, _, _ = mime.ParseMediaType(contentType)
 	}
-	return body, contentType, nil
+	return data, contentType, nil
 }
 
 func (s *Service) doRequest(ctx context.Context, method string, rawURL string, body io.Reader, headers map[string]string) ([]byte, http.Header, error) {

@@ -54,7 +54,7 @@ func (h *GameHandler) HandleMinecraft(ctx context.Context, c *whatsmeow.Client, 
 			status, err := h.mcService.GetServerTapStatus(ctx)
 			if err != nil {
 				logutil.Error(ctx, "Minecraft server status fetch failed", "error", err)
-				helper.SendTextMessage(ctx, c, msg.From, "Failed to fetch default server status: "+err.Error(), nil)
+				helper.SendTextMessage(ctx, c, msg.From, logutil.UserError(ctx), nil)
 				return
 			}
 			h.sendMinecraftStatus(ctx, c, msg.From, "Private Server", status)
