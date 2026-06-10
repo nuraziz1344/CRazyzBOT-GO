@@ -18,6 +18,7 @@ import (
 	"crazyzbot-go/internal/config"
 	"crazyzbot-go/internal/handler"
 	"crazyzbot-go/internal/logutil"
+	"crazyzbot-go/internal/proxy"
 	"crazyzbot-go/internal/services/downloader"
 	"crazyzbot-go/internal/services/earthquake"
 	"crazyzbot-go/internal/services/minecraft"
@@ -56,7 +57,17 @@ func main() {
 	minecraftService := minecraft.NewService()
 	prayerService := prayer.NewService()
 	shippingService := shipping.NewService(os.Getenv("BINDERBYTE_API_KEY"))
-	downloaderService := downloader.NewService()
+
+	// Initialize optional proxy manager for downloader
+	var proxyManager *proxy.Manager
+	var downloaderOpts []downloader.ServiceOption
+	if cfg.ProxyEnabled {
+		proxyManager = proxy.NewManager(cfg.ProxyCountry, cfg.ProxyRefreshInterval)
+		proxyManager.Start(ctx)
+		logutil.Info(ctx, "Proxy manager started", "country", cfg.ProxyCountry, "refresh", cfg.ProxyRefreshInterval.String())
+		downloaderOpts = append(downloaderOpts, downloader.WithProxyManager(proxyManager))
+	}
+	downloaderService := downloader.NewService(downloaderOpts...)
 	earthquakeService := earthquake.NewService()
 
 	// Initialize Storage
@@ -70,7 +81,7 @@ func main() {
 	gameHandler := commands.NewGameHandler(minecraftService)
 	religionHandler := commands.NewReligionHandler(prayerService)
 	utilityHandler := commands.NewUtilityHandler(shippingService)
-	downloaderHandler := commands.NewDownloaderHandler(downloaderService)
+	downloaderHandler := commands.NewDownloaderHandler(downloaderService, proxyManager)
 
 	// Register commands
 	registry := commands.NewRegistry(subscriptionStore)
@@ -100,6 +111,9 @@ func main() {
 	registry.Register("prayerunsubscribe", commands.HandlePrayerUnsubscribe, "punsub")
 	registry.Register("earthquakesubscribe", commands.HandleEarthquakeSubscribe, "esub")
 	registry.Register("earthquakeunsubscribe", commands.HandleEarthquakeUnsubscribe, "eunsub")
+
+	registry.Register("proxystatus", downloaderHandler.HandleProxyStatus, "proxypool")
+	registry.Register("proxytest", downloaderHandler.HandleProxyTest)
 
 	// Initialize Handler
 	botHandler := handler.NewBotHandler(client, cfg, registry)

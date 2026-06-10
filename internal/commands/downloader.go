@@ -7,6 +7,7 @@ import (
 	"crazyzbot-go/internal/dto"
 	"crazyzbot-go/internal/helper"
 	"crazyzbot-go/internal/logutil"
+	"crazyzbot-go/internal/proxy"
 	"crazyzbot-go/internal/services"
 	"crazyzbot-go/internal/services/downloader"
 	"crazyzbot-go/internal/storage"
@@ -15,12 +16,14 @@ import (
 )
 
 type DownloaderHandler struct {
-	service *downloader.Service
+	service      *downloader.Service
+	proxyManager *proxy.Manager
 }
 
-func NewDownloaderHandler(service *downloader.Service) *DownloaderHandler {
+func NewDownloaderHandler(service *downloader.Service, proxyManager *proxy.Manager) *DownloaderHandler {
 	return &DownloaderHandler{
-		service: service,
+		service:      service,
+		proxyManager: proxyManager,
 	}
 }
 
@@ -146,6 +149,51 @@ func (h *DownloaderHandler) HandleDownloader(ctx context.Context, c *whatsmeow.C
 			helper.SendTextMessage(ctx, c, msg.From, "Failed to send media", nil)
 			return
 		}
+	}
+}
+
+
+func (h *DownloaderHandler) HandleProxyStatus(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	if h.proxyManager == nil {
+		helper.SendTextMessage(ctx, c, msg.From, "Proxy manager is not enabled. Set PROXY_ENABLED=true in your .env file.", nil)
+		return
+	}
+
+	stats := h.proxyManager.PoolStats()
+	total := stats["total"].(int)
+
+	reply := fmt.Sprintf("📡 *Proxy Pool Status*\n\nTotal proxies: %d\n", total)
+	reply += fmt.Sprintf("Last refresh: %s\n", stats["last_refresh"])
+
+	if bySource, ok := stats["by_source"].(map[string]int); ok {
+		reply += "\n*By source:*\n"
+		for src, count := range bySource {
+			reply += fmt.Sprintf("  • %s: %d\n", src, count)
+		}
+	}
+	reply += fmt.Sprintf("\nPreferred country: %s\n", h.proxyManager.PreferredCountry())
+	reply += "Type /proxytest to test a random proxy."
+
+	helper.SendTextMessage(ctx, c, msg.From, reply, nil)
+}
+
+func (h *DownloaderHandler) HandleProxyTest(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+	if h.proxyManager == nil {
+		helper.SendTextMessage(ctx, c, msg.From, "Proxy manager is not enabled.", nil)
+		return
+	}
+
+	proxy := h.proxyManager.GetRandom()
+	if proxy == nil {
+		helper.SendTextMessage(ctx, c, msg.From, "No proxies in pool. Try again later.", nil)
+		return
+	}
+
+	helper.SendTextMessage(ctx, c, msg.From, fmt.Sprintf("Testing proxy %s...", proxy.Address), nil)
+	if h.proxyManager.TestProxy(proxy.Address) {
+		helper.SendTextMessage(ctx, c, msg.From, fmt.Sprintf("✅ Proxy %s is working!", proxy.Address), nil)
+	} else {
+		helper.SendTextMessage(ctx, c, msg.From, fmt.Sprintf("❌ Proxy %s failed to respond.", proxy.Address), nil)
 	}
 }
 

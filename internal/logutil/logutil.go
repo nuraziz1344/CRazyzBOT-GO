@@ -81,15 +81,15 @@ func GetLogID(ctx context.Context) string {
 	return id
 }
 
-// sourceAttr returns the "source" log attribute with the caller's file:line.
+// sourceAttr returns the caller's file:line as a "caller" log attribute.
 // skip is the number of frames up the stack (0 = caller of sourceAttr).
 func sourceAttr(skip int) (string, string) {
 	_, file, line, ok := runtime.Caller(skip + 1)
 	if !ok {
-		return "source", "unknown"
+		return "caller", "unknown"
 	}
 	rel := strings.TrimPrefix(file, projectRoot+string(filepath.Separator))
-	return "source", rel + ":" + strconv.Itoa(line)
+	return "caller", rel + ":" + strconv.Itoa(line)
 }
 
 // LoggerFromContext extracts the request-scoped logger from context.
