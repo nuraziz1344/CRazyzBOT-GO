@@ -37,4 +37,4 @@ jobs:
               "cd ${{ secrets.PROJECT_PATH }} && \
                git pull origin master && \
                docker compose build crazyzbot && \
-               docker compose up -d --force-recreate"
+               docker compose up -d --force-recreate crazyzbot"
