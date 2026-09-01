@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"crazyzbot-go/internal/proxy"
 	"crazyzbot-go/internal/services"
 )
 
@@ -42,13 +43,30 @@ type Metadata struct {
 type Service struct {
 	httpClient      *http.Client
 	downloadClient  *http.Client
+	proxyManager    *proxy.Manager
+	useProxy        bool
 }
 
-func NewService() *Service {
-	return &Service{
+type ServiceOption func(*Service)
+
+func WithProxyManager(pm *proxy.Manager) ServiceOption {
+	return func(s *Service) {
+		s.proxyManager = pm
+		s.useProxy = true
+	}
+}
+
+func NewService(opts ...ServiceOption) *Service {
+	s := &Service{
 		httpClient:      &http.Client{Timeout: apiTimeout},
 		downloadClient:  &http.Client{Timeout: downloadTimeout},
 	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s
 }
 
 // Search uses yt-dlp to search for videos
@@ -453,70 +471,163 @@ func (s *Service) resultsFromURLs(ctx context.Context, provider string, mediaTyp
 }
 
 func (s *Service) fetchBytes(ctx context.Context, mediaURL string) ([]byte, string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, mediaURL, nil)
-	if err != nil {
-		return nil, "", err
+	// Try with proxy first if available, fall back to direct
+	maxRetries := 1
+	if s.useProxy {
+		maxRetries = 2 // proxy attempt + direct fallback
 	}
-	req.Header.Set("User-Agent", userAgent)
 
-	res, err := s.downloadClient.Do(req)
-	if err != nil {
-		return nil, "", err
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		var client *http.Client
+		if attempt == 0 && s.useProxy && s.proxyManager != nil {
+			client = &http.Client{
+				Timeout: downloadTimeout,
+				Transport: &http.Transport{
+					Proxy: func(*http.Request) (*url.URL, error) {
+						proxy := s.proxyManager.GetRandomCountry(s.proxyManager.PreferredCountry() != "")
+						if proxy == nil {
+							return nil, nil
+						}
+						return url.Parse("http://" + proxy.Address)
+					},
+				},
+			}
+		} else {
+			client = s.downloadClient
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, mediaURL, nil)
+		if err != nil {
+			return nil, "", err
+		}
+		req.Header.Set("User-Agent", userAgent)
+
+		res, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			if attempt == 0 {
+				continue // retry with direct
+			}
+			return nil, "", err
+		}
+		defer res.Body.Close()
+		if res.StatusCode < 200 || res.StatusCode >= 300 {
+			lastErr = fmt.Errorf("HTTP %d downloading media", res.StatusCode)
+			if attempt == 0 {
+				continue // retry with direct
+			}
+			return nil, "", lastErr
+		}
+		if res.ContentLength > maxDownloadSize {
+			return nil, "", fmt.Errorf("media too large to send via WhatsApp")
+		}
+		limited := io.LimitReader(res.Body, maxDownloadSize+1)
+		data, err := io.ReadAll(limited)
+		if err != nil {
+			lastErr = err
+			if attempt == 0 {
+				continue
+			}
+			return nil, "", err
+		}
+		if len(data) > maxDownloadSize {
+			return nil, "", fmt.Errorf("media too large to send via WhatsApp")
+		}
+		contentType := res.Header.Get("content-type")
+		if contentType != "" {
+			contentType, _, _ = mime.ParseMediaType(contentType)
+		}
+		return data, contentType, nil
 	}
-	defer res.Body.Close()
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, "", fmt.Errorf("HTTP %d downloading media", res.StatusCode)
-	}
-	if res.ContentLength > maxDownloadSize {
-		return nil, "", fmt.Errorf("media too large to send via WhatsApp")
-	}
-	limited := io.LimitReader(res.Body, maxDownloadSize+1)
-	data, err := io.ReadAll(limited)
-	if err != nil {
-		return nil, "", err
-	}
-	if len(data) > maxDownloadSize {
-		return nil, "", fmt.Errorf("media too large to send via WhatsApp")
-	}
-	contentType := res.Header.Get("content-type")
-	if contentType != "" {
-		contentType, _, _ = mime.ParseMediaType(contentType)
-	}
-	return data, contentType, nil
+	return nil, "", lastErr
 }
 
 func (s *Service) doRequest(ctx context.Context, method string, rawURL string, body io.Reader, headers map[string]string) ([]byte, http.Header, error) {
-	req, err := http.NewRequestWithContext(ctx, method, rawURL, body)
-	if err != nil {
-		return nil, nil, err
-	}
-	req.Header.Set("User-Agent", userAgent)
-	for key, value := range headers {
-		if value != "" {
-			req.Header.Set(key, value)
+	// Pre-read body so it can be re-read on retry
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return nil, nil, err
 		}
 	}
 
-	res, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, nil, err
+	maxRetries := 1
+	if s.useProxy {
+		maxRetries = 2 // proxy attempt + direct fallback
 	}
-	defer res.Body.Close()
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, res.Header, fmt.Errorf("HTTP %d", res.StatusCode)
+
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		var client *http.Client
+		if attempt == 0 && s.useProxy && s.proxyManager != nil {
+			client = &http.Client{
+				Timeout: apiTimeout,
+				Transport: &http.Transport{
+					Proxy: func(*http.Request) (*url.URL, error) {
+						p := s.proxyManager.GetRandomCountry(s.proxyManager.PreferredCountry() != "")
+						if p == nil {
+							return nil, nil
+						}
+						return url.Parse("http://" + p.Address)
+					},
+				},
+			}
+		} else {
+			client = s.httpClient
+		}
+
+		var reqBody io.Reader
+		if bodyBytes != nil {
+			reqBody = bytes.NewReader(bodyBytes)
+		}
+		req, err := http.NewRequestWithContext(ctx, method, rawURL, reqBody)
+		if err != nil {
+			return nil, nil, err
+		}
+		req.Header.Set("User-Agent", userAgent)
+		for key, value := range headers {
+			if value != "" {
+				req.Header.Set(key, value)
+			}
+		}
+
+		res, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			if attempt == 0 {
+				continue // retry with direct
+			}
+			return nil, nil, err
+		}
+		defer res.Body.Close()
+		if res.StatusCode < 200 || res.StatusCode >= 300 {
+			lastErr = fmt.Errorf("HTTP %d", res.StatusCode)
+			if attempt == 0 {
+				continue // retry with direct
+			}
+			return nil, res.Header, lastErr
+		}
+		if res.ContentLength > maxDownloadSize {
+			return nil, nil, fmt.Errorf("media too large to send via WhatsApp")
+		}
+		limited := io.LimitReader(res.Body, maxDownloadSize+1)
+		data, err := io.ReadAll(limited)
+		if err != nil {
+			lastErr = err
+			if attempt == 0 {
+				continue
+			}
+			return nil, res.Header, err
+		}
+		if len(data) > maxDownloadSize {
+			return nil, nil, fmt.Errorf("media too large to send via WhatsApp")
+		}
+		return data, res.Header, nil
 	}
-	if res.ContentLength > maxDownloadSize {
-		return nil, res.Header, fmt.Errorf("media too large to send via WhatsApp")
-	}
-	limited := io.LimitReader(res.Body, maxDownloadSize+1)
-	data, err := io.ReadAll(limited)
-	if err != nil {
-		return nil, res.Header, err
-	}
-	if len(data) > maxDownloadSize {
-		return nil, res.Header, fmt.Errorf("media too large to send via WhatsApp")
-	}
-	return data, res.Header, nil
+	return nil, nil, lastErr
 }
 
 type mediaItem struct {

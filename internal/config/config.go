@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"time"
 )
 
 type Config struct {
@@ -9,6 +10,11 @@ type Config struct {
 	LogLevel           string
 	CommandPrefix      string
 	SubscriptionDBFile string
+
+	// Proxy configuration
+	ProxyEnabled       bool
+	ProxyCountry       string
+	ProxyRefreshInterval time.Duration
 }
 
 func LoadConfig() *Config {
@@ -32,10 +38,27 @@ func LoadConfig() *Config {
 		subscriptionDB = "data/subscriptions.db"
 	}
 
+	// Proxy config
+	proxyCountry := os.Getenv("PROXY_COUNTRY")
+	proxyEnabled := os.Getenv("PROXY_ENABLED")
+	if proxyCountry == "" {
+		proxyCountry = "ID"
+	}
+
+	refreshInterval := 30 * time.Minute
+	if val := os.Getenv("PROXY_REFRESH_INTERVAL"); val != "" {
+		if d, err := time.ParseDuration(val); err == nil {
+			refreshInterval = d
+		}
+	}
+
 	return &Config{
-		SessionFile:        sessionFile,
-		LogLevel:           logLevel,
-		CommandPrefix:      prefix,
-		SubscriptionDBFile: subscriptionDB,
+		SessionFile:          sessionFile,
+		LogLevel:             logLevel,
+		CommandPrefix:        prefix,
+		SubscriptionDBFile:   subscriptionDB,
+		ProxyEnabled:         proxyEnabled == "true" || proxyEnabled == "1",
+		ProxyCountry:         proxyCountry,
+		ProxyRefreshInterval: refreshInterval,
 	}
 }
