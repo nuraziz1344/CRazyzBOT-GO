@@ -11,7 +11,7 @@ import (
 	"go.mau.fi/whatsmeow"
 )
 
-func HandlePing(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func HandlePing(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	logutil.Debug(ctx, "Ping command invoked", "from", msg.From.String())
 	helper.SendTextMessage(ctx, c, msg.From, "Pong!", &dto.Quoted{
 		QuotedMessage: msg.Message,
@@ -20,7 +20,7 @@ func HandlePing(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, ar
 	})
 }
 
-func HandleHelp(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func HandleHelp(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	logutil.Debug(ctx, "Help command invoked", "from", msg.From.String())
 	helpText := `*CRazyzBOT Features*
 
@@ -48,15 +48,18 @@ func HandleHelp(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, ar
 
 	*Utilities*
 	- /minecraft (mc) [host] - Check Minecraft server status
-	- /sholat <city> - Get prayer times (e.g., /sholat Jakarta)
-	- /sholat listkota <keyword> - Search supported prayer cities
 	- /cekresi <courier> <awb> - Track a shipment
 
-	*Prayer & Earthquake*
-	- /psub <city> - Subscribe to prayer notifications for a city (Example: /prayersubscribe Jakarta)
-	- /punsub - Unsubscribe from prayer notifications
-	- /esub - Subscribe to earthquake notifications (magnitude > 4.0)
-	- /eunsub - Unsubscribe from earthquake notifications
+	*Prayer Times*
+	- /sholat <city> - Get prayer times (e.g., /sholat Jakarta)
+	- /sholat listkota <keyword> - Search supported prayer cities
+	- /sholat subscribe (sub) <city> - Subscribe to prayer notifications for a city
+	- /sholat unsub (unsubscribe) - Unsubscribe from prayer notifications
+
+	*Earthquake*
+	- /gempa (earthquake, quake) - Show the last 3 recorded earthquakes
+	- /gempa subscribe (sub) - Subscribe to earthquake alert notifications
+	- /gempa unsub (unsubscribe) - Unsubscribe from earthquake notifications
 
 	*Auto Features*
 	- Send a sticker in private chat to auto-convert it with /toimg

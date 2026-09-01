@@ -24,7 +24,7 @@ func NewUtilityHandler(shippingService services.ShippingProvider) *UtilityHandle
 	}
 }
 
-func (h *UtilityHandler) HandleResi(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func (h *UtilityHandler) HandleResi(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	logutil.Info(ctx, "Resi command", "args", args, "from", msg.From.String())
 	parts := strings.Split(args, " ")
 	if len(parts) < 2 {

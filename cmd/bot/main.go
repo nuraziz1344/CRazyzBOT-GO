@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/joho/godotenv/autoload"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/mdp/qrterminal"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
@@ -38,8 +38,8 @@ func main() {
 
 	dbLog := waLog.Stdout("Database", cfg.LogLevel, true)
 
-	// Create a new SQLite store
-	db, err := sqlstore.New(context.Background(), "sqlite3", "file:"+cfg.SessionFile+"?_foreign_keys=on", dbLog)
+	// Create a new Postgres-backed whatsmeow session store
+	db, err := sqlstore.New(context.Background(), "pgx", cfg.PostgresDSN, dbLog)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -50,7 +50,7 @@ func main() {
 	}
 
 	// Log levels: ERROR, WARN, INFO, DEBUG
-	clientLog := waLog.Stdout("Client", "WARN", true) 
+	clientLog := waLog.Stdout("Client", "WARN", true)
 	client := whatsmeow.NewClient(deviceStore, clientLog)
 
 	// Initialize Services
@@ -58,24 +58,25 @@ func main() {
 	prayerService := prayer.NewService()
 	shippingService := shipping.NewService(os.Getenv("BINDERBYTE_API_KEY"))
 
+	// Initialize application storage, including the persisted proxy pool.
+	subscriptionStore, err := storage.NewPostgresSubscriptionStore(context.Background(), cfg.PostgresDSN)
+	if err != nil {
+		log.Fatalf("Failed to initialize subscription storage: %v", err)
+	}
+	defer subscriptionStore.Close()
+
 	// Initialize optional proxy manager for downloader
 	var proxyManager *proxy.Manager
 	var downloaderOpts []downloader.ServiceOption
 	if cfg.ProxyEnabled {
 		proxyManager = proxy.NewManager(cfg.ProxyCountry, cfg.ProxyRefreshInterval)
+		proxyManager.SetStore(subscriptionStore)
 		proxyManager.Start(ctx)
 		logutil.Info(ctx, "Proxy manager started", "country", cfg.ProxyCountry, "refresh", cfg.ProxyRefreshInterval.String())
 		downloaderOpts = append(downloaderOpts, downloader.WithProxyManager(proxyManager))
 	}
 	downloaderService := downloader.NewService(downloaderOpts...)
-	earthquakeService := earthquake.NewService()
-
-	// Initialize Storage
-	subscriptionStore, err := storage.NewSQLiteSubscriptionStore(cfg.SubscriptionDBFile)
-	if err != nil {
-		log.Fatalf("Failed to initialize subscription storage: %v", err)
-	}
-	defer subscriptionStore.Close()
+	earthquakeService := earthquake.NewServiceWithConfig(earthquake.Config{MinMagnitude: cfg.EarthquakeMinMagnitude})
 
 	// Initialize Handlers
 	gameHandler := commands.NewGameHandler(minecraftService)
@@ -107,10 +108,7 @@ func main() {
 	registry.Register("twitter", downloaderHandler.HandleDownloader, "x", "twitterdl")
 
 	registry.Register("ocr", commands.HandleOCR)
-	registry.Register("prayersubscribe", commands.HandlePrayerSubscribe, "psub")
-	registry.Register("prayerunsubscribe", commands.HandlePrayerUnsubscribe, "punsub")
-	registry.Register("earthquakesubscribe", commands.HandleEarthquakeSubscribe, "esub")
-	registry.Register("earthquakeunsubscribe", commands.HandleEarthquakeUnsubscribe, "eunsub")
+	registry.Register("gempa", commands.HandleEarthquake, "earthquake", "quake")
 
 	registry.Register("proxystatus", downloaderHandler.HandleProxyStatus, "proxypool")
 	registry.Register("proxytest", downloaderHandler.HandleProxyTest)

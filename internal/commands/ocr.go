@@ -13,7 +13,7 @@ import (
 	"go.mau.fi/whatsmeow"
 )
 
-func HandleOCR(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func HandleOCR(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	logutil.Info(ctx, "OCR command", "from", msg.From.String())
 	var media *whatsmeow.DownloadableMessage
 

@@ -24,7 +24,7 @@ echo "✅ Build OK"
 echo ""
 
 echo "🚀 Running proxy crawler..."
-echo "   (This fetches from 3 sources + tests a few proxies)"
+echo "   (This fetches the Indonesian source + tests a few proxies)"
 echo "   (May take 30-60s depending on proxy responsiveness)"
 echo ""
 /tmp/proxytest

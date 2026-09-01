@@ -13,7 +13,7 @@ import (
 	"go.mau.fi/whatsmeow/proto/waE2E"
 )
 
-func HandleTagAll(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func HandleTagAll(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	logutil.Info(ctx, "TagAll command", "group", msg.From.String(), "sender", msg.Phone)
 	if !msg.IsGroup {
 		helper.SendTextMessage(ctx, c, msg.From, "This command can only be used in groups.", nil)

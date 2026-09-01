@@ -3,7 +3,6 @@ package prayer
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,6 +17,11 @@ import (
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types"
 )
+
+// maxSleep caps how long the scheduler ever sleeps in one go, so a newly added
+// subscription is picked up within this window rather than waiting out whatever
+// the previously-earliest subscriber's prayer time was.
+const maxSleep = 5 * time.Minute
 
 type prayerTime struct {
 	Name string
@@ -55,29 +59,39 @@ func (c *cityIDCache) resolve(ctx context.Context, service *Service, nameOrID st
 	return id, nil
 }
 
-func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Service, store storage.SubscriptionStore) {
+// StartScheduler runs the prayer notification loop. Unlike a naive per-subscriber loop, it
+// computes the next prayer time for every subscriber up front, sleeps once until the earliest
+// one is due (capped at maxSleep), then sends to everyone due at that wake — so one subscriber's
+// far-off prayer time never delays another's.
+func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Service, store storage.Store) {
 	cache := &cityIDCache{entries: make(map[string]string)}
+	lastSent := make(map[string]time.Time) // jid -> prayer time already notified, dedupes early wakes
 
 	go func() {
 		for {
-			// Get all prayer subscriptions
 			prayerSubs, err := store.ListPrayerSubscriptions(ctx)
 			if err != nil {
 				logutil.Error(ctx, "Prayer scheduler: failed to get prayer subscriptions", "error", err)
-				if !sleepOrDone(ctx, 5*time.Minute) {
+				if !sleepOrDone(ctx, maxSleep) {
 					return
 				}
 				continue
 			}
 
 			if len(prayerSubs) == 0 {
-				if !sleepOrDone(ctx, 5*time.Minute) {
+				if !sleepOrDone(ctx, maxSleep) {
 					return
 				}
 				continue
 			}
 
-			// Check each subscribed user's prayer time
+			type due struct {
+				jidStr string
+				prayer *prayerTime
+			}
+			var upcoming []due
+			earliest := time.Time{}
+
 			for jidStr, rawCity := range prayerSubs {
 				cityID, err := cache.resolve(ctx, service, rawCity)
 				if err != nil {
@@ -94,46 +108,57 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 					continue
 				}
 
-				wait := time.Until(nextPrayer.At)
-				if wait < time.Second {
-					wait = time.Second
+				upcoming = append(upcoming, due{jidStr: jidStr, prayer: nextPrayer})
+				if earliest.IsZero() || nextPrayer.At.Before(earliest) {
+					earliest = nextPrayer.At
 				}
+			}
 
-				logutil.Info(ctx, "Prayer scheduler: next prayer",
-					"prayer", nextPrayer.Name,
-					"at", nextPrayer.At.Format(time.RFC3339),
-					"jid", jidStr,
-				)
-
-				if !sleepOrDone(ctx, wait) {
+			if len(upcoming) == 0 {
+				if !sleepOrDone(ctx, maxSleep) {
 					return
 				}
+				continue
+			}
 
-				message := buildPrayerMessage(nextPrayer, "")
-				jid := types.NewJID(jidStr, "s.whatsapp.net")
+			wait := time.Until(earliest)
+			if wait < time.Second {
+				wait = time.Second
+			}
+			if wait > maxSleep {
+				wait = maxSleep
+			}
+
+			logutil.Info(ctx, "Prayer scheduler: sleeping until next due prayer",
+				"at", earliest.Format(time.RFC3339),
+				"subscribers", len(upcoming),
+			)
+
+			if !sleepOrDone(ctx, wait) {
+				return
+			}
+
+			now := time.Now()
+			for _, d := range upcoming {
+				if d.prayer.At.After(now) {
+					continue // not due yet — will be picked up on a later pass
+				}
+				if lastSent[d.jidStr].Equal(d.prayer.At) {
+					continue // already notified for this exact prayer time
+				}
+
+				jid, err := types.ParseJID(d.jidStr)
+				if err != nil {
+					logutil.Error(ctx, "Invalid prayer subscriber JID", "jid", d.jidStr, "error", err)
+					continue
+				}
+
+				message := buildPrayerMessage(d.prayer, "")
 				helper.SendTextMessage(ctx, client, jid, message, nil)
+				lastSent[d.jidStr] = d.prayer.At
 			}
 		}
 	}()
-}
-
-func resolveCity(ctx context.Context, service *Service) (string, string) {
-	cityID := strings.TrimSpace(os.Getenv("PRAYER_CITY_ID"))
-	if cityID != "" {
-		return cityID, strings.TrimSpace(os.Getenv("PRAYER_CITY_NAME"))
-	}
-
-	cityName := strings.TrimSpace(os.Getenv("PRAYER_CITY"))
-	if cityName == "" {
-		return "", ""
-	}
-
-	id, err := service.GetCityID(ctx, cityName)
-	if err != nil {
-		logutil.Error(ctx, "Prayer scheduler: failed to resolve city", "error", err)
-		return "", ""
-	}
-	return id, cityName
 }
 
 func getNextPrayerForJID(ctx context.Context, service *Service, jidStr string, cityID string) (*prayerTime, error) {
@@ -206,68 +231,6 @@ func buildPrayerTimes(sched *services.PrayerSchedule, date time.Time, loc *time.
 	add("Maghrib", sched.Maghrib)
 	add("Isya", sched.Isha)
 
-	return list
-}
-
-func collectPrayerTargets(ctx context.Context, client *whatsmeow.Client) []types.JID {
-	targets := make(map[string]types.JID)
-
-	ownerNumber := strings.TrimSpace(os.Getenv("OWNER_NUMBER"))
-	if ownerNumber != "" {
-		jid := types.NewJID(ownerNumber, "s.whatsapp.net")
-		targets[jid.String()] = jid
-	}
-
-	keywords := parseKeywords(os.Getenv("PRAYER_GROUP_KEYWORDS"))
-	if len(keywords) == 0 {
-		return mapToSlice(targets)
-	}
-
-	groups, err := client.GetJoinedGroups(ctx)
-	if err != nil {
-		logutil.Error(ctx, "Prayer scheduler: error getting joined groups", "error", err)
-		return mapToSlice(targets)
-	}
-
-	for _, group := range groups {
-		if matchesAnyKeyword(group.Name, keywords) {
-			jid := group.JID
-			targets[jid.String()] = jid
-		}
-	}
-
-	return mapToSlice(targets)
-}
-
-func parseKeywords(raw string) []string {
-	var out []string
-	for _, k := range strings.Split(raw, ",") {
-		k = strings.ToLower(strings.TrimSpace(k))
-		if k != "" {
-			out = append(out, k)
-		}
-	}
-	return out
-}
-
-func matchesAnyKeyword(name string, keywords []string) bool {
-	name = strings.ToLower(strings.TrimSpace(name))
-	if name == "" {
-		return false
-	}
-	for _, key := range keywords {
-		if strings.Contains(name, key) {
-			return true
-		}
-	}
-	return false
-}
-
-func mapToSlice(m map[string]types.JID) []types.JID {
-	list := make([]types.JID, 0, len(m))
-	for _, jid := range m {
-		list = append(list, jid)
-	}
 	return list
 }
 

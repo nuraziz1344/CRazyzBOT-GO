@@ -13,16 +13,16 @@ import (
 	"go.mau.fi/whatsmeow"
 )
 
-type CommandHandler func(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore)
+type CommandHandler func(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store)
 
 type Registry struct {
 	commands map[string]CommandHandler
 	aliases  map[string]string
-	subStore storage.SubscriptionStore
+	subStore storage.Store
 	mu       sync.RWMutex
 }
 
-func NewRegistry(subStore storage.SubscriptionStore) *Registry {
+func NewRegistry(subStore storage.Store) *Registry {
 	return &Registry{
 		commands: make(map[string]CommandHandler),
 		aliases:  make(map[string]string),
@@ -41,57 +41,57 @@ func (r *Registry) Register(name string, handler CommandHandler, aliases ...stri
 }
 
 func (r *Registry) Handle(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg) {
-		// 1. Handle TagAll/Everyone special case
-		// if (msg.Body == "@all" || msg.Body == "@everyone") && msg.GroupInfo != nil {
-		// 	if handler, ok := r.commands["tagall"]; ok {
-		// 		handler(ctx, c, msg, msg.Body, r.subStore)
-		// 		return
-		// 	}
-		// }
+	// 1. Handle TagAll/Everyone special case
+	// if (msg.Body == "@all" || msg.Body == "@everyone") && msg.GroupInfo != nil {
+	// 	if handler, ok := r.commands["tagall"]; ok {
+	// 		handler(ctx, c, msg, msg.Body, r.subStore)
+	// 		return
+	// 	}
+	// }
 
-		// 2. Handle Sticker/Image conversion (media-based trigger)
-		if !msg.IsGroup && msg.QuotedMessage == nil && (msg.MediaType == dto.MediaSticker || msg.MediaType == dto.MediaAnimatedSticker) {
-			if handler, ok := r.commands["toimg"]; ok {
-				handler(ctx, c, msg, "", r.subStore)
-				return
-			}
-		}
-
-		// 3. Handle Text Commands
-		prefix := os.Getenv("COMMAND_PREFIX")
-		if prefix == "" {
-			prefix = "/"
-		}
-
-		if msg.Body == "" || !strings.HasPrefix(msg.Body, prefix) {
+	// 2. Handle Sticker/Image conversion (media-based trigger)
+	if !msg.IsGroup && msg.QuotedMessage == nil && (msg.MediaType == dto.MediaSticker || msg.MediaType == dto.MediaAnimatedSticker) {
+		if handler, ok := r.commands["toimg"]; ok {
+			handler(ctx, c, msg, "", r.subStore)
 			return
 		}
+	}
 
-		// Remove prefix
-		bodyWithoutPrefix := msg.Body[len(prefix):]
-		parts := strings.SplitN(bodyWithoutPrefix, " ", 2)
-		cmdName := strings.ToLower(parts[0])
-		args := ""
-		if len(parts) > 1 {
-			args = parts[1]
-		}
+	// 3. Handle Text Commands
+	prefix := os.Getenv("COMMAND_PREFIX")
+	if prefix == "" {
+		prefix = "/"
+	}
 
-		r.mu.RLock()
-		handler, ok := r.commands[cmdName]
-		if !ok {
-			// Check aliases
-			if realName, found := r.aliases[cmdName]; found {
-				handler, ok = r.commands[realName]
-			}
-		}
-		r.mu.RUnlock()
+	if msg.Body == "" || !strings.HasPrefix(msg.Body, prefix) {
+		return
+	}
 
-		if ok {
-			logutil.Info(ctx, "Executing command",
-				"command", cmdName,
-				"args", args,
-				"from", msg.From.String(),
-			)
-			go handler(ctx, c, msg, args, r.subStore)
+	// Remove prefix
+	bodyWithoutPrefix := msg.Body[len(prefix):]
+	parts := strings.SplitN(bodyWithoutPrefix, " ", 2)
+	cmdName := strings.ToLower(parts[0])
+	args := ""
+	if len(parts) > 1 {
+		args = parts[1]
+	}
+
+	r.mu.RLock()
+	handler, ok := r.commands[cmdName]
+	if !ok {
+		// Check aliases
+		if realName, found := r.aliases[cmdName]; found {
+			handler, ok = r.commands[realName]
 		}
 	}
+	r.mu.RUnlock()
+
+	if ok {
+		logutil.Info(ctx, "Executing command",
+			"command", cmdName,
+			"args", args,
+			"from", msg.From.String(),
+		)
+		go handler(ctx, c, msg, args, r.subStore)
+	}
+}

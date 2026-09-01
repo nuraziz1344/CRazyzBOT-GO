@@ -26,7 +26,7 @@ func NewGameHandler(mcService services.MinecraftProvider) *GameHandler {
 	}
 }
 
-func (h *GameHandler) HandleMinecraft(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func (h *GameHandler) HandleMinecraft(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	logutil.Info(ctx, "Minecraft command", "args", args, "from", msg.From.String())
 	if args == "" {
 		// Default check for authorized groups

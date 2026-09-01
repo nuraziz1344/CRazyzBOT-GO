@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-crazyzbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crazyzbot}
+      POSTGRES_DB: ${POSTGRES_DB:-crazyzbot}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crazyzbot} -d ${POSTGRES_DB:-crazyzbot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   crazyzbot:
     image: ghcr.io/nuraziz1344/crazyzbot-go:latest
     build:
@@ -8,13 +23,19 @@ services:
     env_file:
       - .env
     environment:
-      - SESSION_FILE=/app/data/session.db
+      - POSTGRES_DSN=postgres://${POSTGRES_USER:-crazyzbot}:${POSTGRES_PASSWORD:-crazyzbot}@postgres:5432/${POSTGRES_DB:-crazyzbot}?sslmode=disable
     volumes:
       - ./data:/app/data
     stdin_open: true
     tty: true
+    depends_on:
+      postgres:
+        condition: service_healthy
     deploy:
       resources:
         limits:
           cpus: '0.50'
           memory: 512M
+
+volumes:
+  postgres_data:

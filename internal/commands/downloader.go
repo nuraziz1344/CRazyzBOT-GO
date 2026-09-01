@@ -27,7 +27,7 @@ func NewDownloaderHandler(service *downloader.Service, proxyManager *proxy.Manag
 	}
 }
 
-func (h *DownloaderHandler) HandleYTSearch(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func (h *DownloaderHandler) HandleYTSearch(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	logutil.Info(ctx, "YTSearch command", "query", args, "from", msg.From.String())
 	if args == "" {
 		helper.SendTextMessage(ctx, c, msg.From, "Usage: /yts <query>", nil)
@@ -55,7 +55,7 @@ func (h *DownloaderHandler) HandleYTSearch(ctx context.Context, c *whatsmeow.Cli
 	helper.SendTextMessage(ctx, c, msg.From, reply, nil)
 }
 
-func (h *DownloaderHandler) HandleYTSearch2(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func (h *DownloaderHandler) HandleYTSearch2(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	logutil.Info(ctx, "YTSearch2 command", "query", args, "from", msg.From.String())
 	if args == "" {
 		helper.SendTextMessage(ctx, c, msg.From, "Usage: /yts2 <query>", nil)
@@ -98,7 +98,7 @@ func formatDuration(seconds int) string {
 	return fmt.Sprintf("%d:%02d", mins, secs)
 }
 
-func (h *DownloaderHandler) HandleYoutubeDL3(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func (h *DownloaderHandler) HandleYoutubeDL3(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	logutil.Info(ctx, "YoutubeDL3 command", "url", args, "from", msg.From.String())
 	url := args
 	if url == "" {
@@ -122,7 +122,7 @@ func (h *DownloaderHandler) HandleYoutubeDL3(ctx context.Context, c *whatsmeow.C
 	}
 }
 
-func (h *DownloaderHandler) HandleDownloader(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func (h *DownloaderHandler) HandleDownloader(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	logutil.Info(ctx, "Download command", "url", args, "from", msg.From.String())
 	url := args
 	if url == "" {
@@ -152,8 +152,7 @@ func (h *DownloaderHandler) HandleDownloader(ctx context.Context, c *whatsmeow.C
 	}
 }
 
-
-func (h *DownloaderHandler) HandleProxyStatus(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func (h *DownloaderHandler) HandleProxyStatus(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	if h.proxyManager == nil {
 		helper.SendTextMessage(ctx, c, msg.From, "Proxy manager is not enabled. Set PROXY_ENABLED=true in your .env file.", nil)
 		return
@@ -177,7 +176,7 @@ func (h *DownloaderHandler) HandleProxyStatus(ctx context.Context, c *whatsmeow.
 	helper.SendTextMessage(ctx, c, msg.From, reply, nil)
 }
 
-func (h *DownloaderHandler) HandleProxyTest(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func (h *DownloaderHandler) HandleProxyTest(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	if h.proxyManager == nil {
 		helper.SendTextMessage(ctx, c, msg.From, "Proxy manager is not enabled.", nil)
 		return

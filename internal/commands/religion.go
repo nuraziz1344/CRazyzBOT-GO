@@ -24,10 +24,26 @@ func NewReligionHandler(prayerService services.PrayerProvider) *ReligionHandler 
 	}
 }
 
-func (h *ReligionHandler) HandlePrayer(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func (h *ReligionHandler) HandlePrayer(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	logutil.Info(ctx, "Prayer schedule command", "args", args, "from", msg.From.String())
 	if args == "" {
-		helper.SendTextMessage(ctx, c, msg.From, "Usage: /sholat <city name> or /sholat listkota <keyword>", nil)
+		helper.SendTextMessage(ctx, c, msg.From, "Usage:\n/sholat <city name>\n/sholat listkota <keyword>\n/sholat subscribe <city name>\n/sholat unsub", nil)
+		return
+	}
+
+	parts := strings.SplitN(args, " ", 2)
+	sub := strings.ToLower(parts[0])
+
+	switch sub {
+	case "subscribe", "sub":
+		cityArg := ""
+		if len(parts) > 1 {
+			cityArg = strings.TrimSpace(parts[1])
+		}
+		h.handlePrayerSubscribe(ctx, c, msg, cityArg, store)
+		return
+	case "unsub", "unsubscribe":
+		h.handlePrayerUnsubscribe(ctx, c, msg, store)
 		return
 	}
 
@@ -83,4 +99,39 @@ func (h *ReligionHandler) HandlePrayer(ctx context.Context, c *whatsmeow.Client,
 	res += fmt.Sprintf("Isya: %s", schedule.Isha)
 
 	helper.SendTextMessage(ctx, c, msg.From, res, nil)
+}
+
+func (h *ReligionHandler) handlePrayerSubscribe(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, cityArg string, store storage.Store) {
+	logutil.Info(ctx, "Prayer subscribe", "city", cityArg, "jid", msg.From.String())
+	if cityArg == "" {
+		helper.SendTextMessage(ctx, c, msg.From, "Usage: /sholat subscribe <city>\nExample: /sholat subscribe Sleman", nil)
+		return
+	}
+
+	cities, err := h.prayerService.SearchCity(ctx, cityArg)
+	if err != nil || len(cities) == 0 {
+		logutil.Error(ctx, "Prayer subscribe: city lookup failed", "city", cityArg, "error", err, "count", len(cities))
+		helper.SendTextMessage(ctx, c, msg.From, "City not found", nil)
+		return
+	}
+	city := cities[0]
+
+	if err := store.SetPrayerSubscription(ctx, msg.From.String(), city.ID); err != nil {
+		logutil.Error(ctx, "Prayer subscribe failed", "jid", msg.From.String(), "city", city.ID, "error", err)
+		helper.SendTextMessage(ctx, c, msg.From, fmt.Sprintf("Failed to subscribe: %v", err), nil)
+		return
+	}
+
+	helper.SendTextMessage(ctx, c, msg.From, fmt.Sprintf("✅ Subscribed to prayer notifications for: %s", city.Lokasi), nil)
+}
+
+func (h *ReligionHandler) handlePrayerUnsubscribe(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, store storage.Store) {
+	logutil.Info(ctx, "Prayer unsubscribe", "jid", msg.From.String())
+	if err := store.DeletePrayerSubscription(ctx, msg.From.String()); err != nil {
+		logutil.Error(ctx, "Prayer unsubscribe failed", "jid", msg.From.String(), "error", err)
+		helper.SendTextMessage(ctx, c, msg.From, fmt.Sprintf("Failed to unsubscribe: %v", err), nil)
+		return
+	}
+
+	helper.SendTextMessage(ctx, c, msg.From, "✅ Unsubscribed from prayer notifications", nil)
 }

@@ -12,9 +12,8 @@ import (
 	"go.mau.fi/whatsmeow/types"
 )
 
-func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Service, store storage.SubscriptionStore) {
+func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Service, store storage.Store) {
 	ticker := time.NewTicker(service.GetInterval())
-	startupTime := time.Now()
 
 	go func() {
 		defer ticker.Stop()
@@ -29,36 +28,34 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 				return
 			}
 
-			eventID := event.ID()
-			if eventID == "" || eventID == service.GetLastEventID() {
+			if event.ID() == "" {
 				return
 			}
 
-			eventTime, err := time.Parse(time.RFC3339, event.DateTime)
-			if err != nil {
-				logutil.Warn(ctx, "Error parsing earthquake time", "datetime", event.DateTime, "error", err)
+			eventTime, ok := event.EventTime()
+			if !ok {
+				logutil.Warn(ctx, "Error parsing earthquake time", "datetime", event.DateTime)
 				eventTime = time.Now()
 			}
 
-			if event.Magnitude <= 4.0 {
+			meetsThreshold := service.MeetsThreshold(event.Magnitude)
+			storedEvent := event.ToStorageEvent(eventTime, meetsThreshold)
+
+			isNew, err := store.SaveEarthquakeEvent(ctx, storedEvent)
+			if err != nil {
+				logutil.Error(ctx, "Error saving earthquake event", "error", err, "id", storedEvent.ID)
 				return
 			}
-			if eventTime.Before(startupTime) {
-				logutil.Info(ctx, "Skipping old earthquake event", "eventTime", eventTime)
+			if !isNew {
+				// Already seen (and, if applicable, already notified) on a previous tick.
+				return
+			}
+			if !meetsThreshold {
 				return
 			}
 			if time.Since(eventTime) > (2 * service.GetInterval()) {
-				logutil.Info(ctx, "Skipping old earthquake event (interval)", "eventTime", eventTime)
+				logutil.Info(ctx, "Skipping stale earthquake event", "eventTime", eventTime)
 				return
-			}
-
-			service.SetLastEventID(eventID)
-
-			alert := Alert{Text: formatMessage(*event), ShakemapURL: buildShakemapURL(event.ShakeMap)}
-			if alert.ShakemapURL != "" {
-				if img, err := service.GetShakeMap(ctx, event.ShakeMap); err == nil && len(img) > 0 {
-					alert.Shakemap = img
-				}
 			}
 
 			subscribers, err := store.ListEarthquakeSubscriptions(ctx)
@@ -70,14 +67,38 @@ func StartScheduler(ctx context.Context, client *whatsmeow.Client, service *Serv
 				return
 			}
 
+			var shakemap []byte
+			if storedEvent.ShakeMap != "" {
+				if img, err := service.GetShakeMap(ctx, storedEvent.ShakeMap); err == nil && len(img) > 0 {
+					shakemap = img
+				}
+			}
+
+			text := FormatEvent(*storedEvent)
+			notifiedAny := false
 			for _, jidStr := range subscribers {
-				jid := types.NewJID(jidStr, "s.whatsapp.net")
-				if len(alert.Shakemap) > 0 {
-					if sendErr := helper.SendImageMessageWithCaption(ctx, client, jid, &alert.Shakemap, alert.Text, nil); sendErr != nil {
-						logutil.Error(ctx, "Error sending shakemap", "error", sendErr, "jid", jidStr)
-					}
+				jid, err := types.ParseJID(jidStr)
+				if err != nil {
+					logutil.Error(ctx, "Invalid earthquake subscriber JID", "jid", jidStr, "error", err)
+					continue
+				}
+
+				var sendErr error
+				if len(shakemap) > 0 {
+					sendErr = helper.SendImageMessageWithCaption(ctx, client, jid, &shakemap, text, nil)
 				} else {
-					helper.SendTextMessage(ctx, client, jid, alert.Text, nil)
+					helper.SendTextMessage(ctx, client, jid, text, nil)
+				}
+				if sendErr != nil {
+					logutil.Error(ctx, "Error sending earthquake alert", "error", sendErr, "jid", jidStr)
+					continue
+				}
+				notifiedAny = true
+			}
+
+			if notifiedAny {
+				if err := store.MarkEarthquakeNotified(ctx, storedEvent.ID); err != nil {
+					logutil.Error(ctx, "Error marking earthquake event notified", "error", err, "id", storedEvent.ID)
 				}
 			}
 		}

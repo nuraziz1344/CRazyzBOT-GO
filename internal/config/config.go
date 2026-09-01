@@ -1,26 +1,30 @@
 package config
 
 import (
+	"log"
 	"os"
+	"strconv"
 	"time"
 )
 
+const defaultEarthquakeMinMagnitude = 3.5
+
 type Config struct {
-	SessionFile        string
-	LogLevel           string
-	CommandPrefix      string
-	SubscriptionDBFile string
+	PostgresDSN            string
+	LogLevel               string
+	CommandPrefix          string
+	EarthquakeMinMagnitude float64
 
 	// Proxy configuration
-	ProxyEnabled       bool
-	ProxyCountry       string
+	ProxyEnabled         bool
+	ProxyCountry         string
 	ProxyRefreshInterval time.Duration
 }
 
 func LoadConfig() *Config {
-	sessionFile := os.Getenv("SESSION_FILE")
-	if sessionFile == "" {
-		sessionFile = "data/session.db"
+	postgresDSN := os.Getenv("POSTGRES_DSN")
+	if postgresDSN == "" {
+		log.Fatal("POSTGRES_DSN is required")
 	}
 
 	logLevel := os.Getenv("LOG_LEVEL")
@@ -33,9 +37,13 @@ func LoadConfig() *Config {
 		prefix = "/"
 	}
 
-	subscriptionDB := os.Getenv("SUBSCRIPTION_DB_FILE")
-	if subscriptionDB == "" {
-		subscriptionDB = "data/subscriptions.db"
+	minMagnitude := defaultEarthquakeMinMagnitude
+	if raw := os.Getenv("EARTHQUAKE_MIN_MAGNITUDE"); raw != "" {
+		if parsed, err := strconv.ParseFloat(raw, 64); err == nil && parsed > 0 {
+			minMagnitude = parsed
+		} else {
+			log.Printf("Invalid EARTHQUAKE_MIN_MAGNITUDE %q, using default %.1f", raw, defaultEarthquakeMinMagnitude)
+		}
 	}
 
 	// Proxy config
@@ -53,12 +61,12 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		SessionFile:          sessionFile,
-		LogLevel:             logLevel,
-		CommandPrefix:        prefix,
-		SubscriptionDBFile:   subscriptionDB,
-		ProxyEnabled:         proxyEnabled == "true" || proxyEnabled == "1",
-		ProxyCountry:         proxyCountry,
-		ProxyRefreshInterval: refreshInterval,
+		PostgresDSN:            postgresDSN,
+		LogLevel:               logLevel,
+		CommandPrefix:          prefix,
+		EarthquakeMinMagnitude: minMagnitude,
+		ProxyEnabled:           proxyEnabled == "true" || proxyEnabled == "1",
+		ProxyCountry:           proxyCountry,
+		ProxyRefreshInterval:   refreshInterval,
 	}
 }

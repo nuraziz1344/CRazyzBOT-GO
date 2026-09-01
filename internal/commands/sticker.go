@@ -23,7 +23,7 @@ import (
 
 const maxStickerSize = 1024 * 1024 // 1MB
 
-func HandleSticker(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, store storage.SubscriptionStore) {
+func HandleSticker(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, store storage.Store) {
 	logutil.Info(ctx, "Sticker command", "pack", packName, "from", msg.From.String())
 	media, mediaType, ok := resolveStickerMedia(msg)
 	if !ok {
@@ -70,7 +70,7 @@ func HandleSticker(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg,
 	}
 }
 
-func HandleSticker2(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, store storage.SubscriptionStore) {
+func HandleSticker2(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, packName string, store storage.Store) {
 	logutil.Info(ctx, "Sticker2 command", "pack", packName, "from", msg.From.String())
 	media, mediaType, ok := resolveStickerMedia(msg)
 	if !ok {

@@ -4,9 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sync"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // SubscriptionStore defines the interface for subscription persistence
@@ -25,95 +22,81 @@ type SubscriptionStore interface {
 	Close() error
 }
 
-// SQLiteSubscriptionStore implements SubscriptionStore using SQLite
-type SQLiteSubscriptionStore struct {
-	db             *sql.DB
-	prayerStmt     *sql.Stmt
-	earthquakeStmt *sql.Stmt
-	mu             sync.RWMutex
+// PostgresSubscriptionStore implements SubscriptionStore using PostgreSQL
+type PostgresSubscriptionStore struct {
+	db *sql.DB
 }
 
-// NewSQLiteSubscriptionStore creates a new SQLite-backed subscription store
-func NewSQLiteSubscriptionStore(dbPath string) (*SQLiteSubscriptionStore, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+// NewPostgresSubscriptionStore creates a new Postgres-backed subscription store.
+// dsn is a standard Postgres connection string, e.g.
+// "postgres://user:pass@host:5432/dbname?sslmode=disable".
+func NewPostgresSubscriptionStore(ctx context.Context, dsn string) (*PostgresSubscriptionStore, error) {
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open subscription database: %w", err)
 	}
 
-	// Test connection
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping subscription database: %w", err)
 	}
 
-	// Create tables if they don't exist
-	if err := createTables(db); err != nil {
+	if err := createTables(ctx, db); err != nil {
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
 
-	// Prepare statements
-	prayerStmt, err := db.Prepare(`
-		INSERT OR REPLACE INTO prayer_subscriptions (jid, city_id, updated_at)
-		VALUES (?, ?, CURRENT_TIMESTAMP)
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare prayer statement: %w", err)
-	}
-
-	earthquakeStmt, err := db.Prepare(`
-		INSERT OR REPLACE INTO earthquake_subscriptions (jid, updated_at)
-		VALUES (?, CURRENT_TIMESTAMP)
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare earthquake statement: %w", err)
-	}
-
-	return &SQLiteSubscriptionStore{
-		db:             db,
-		prayerStmt:     prayerStmt,
-		earthquakeStmt: earthquakeStmt,
-	}, nil
+	return &PostgresSubscriptionStore{db: db}, nil
 }
 
 // createTables creates the necessary tables if they don't exist
-func createTables(db *sql.DB) error {
-	// Prayer subscriptions table
+func createTables(ctx context.Context, db *sql.DB) error {
 	prayerTable := `
 		CREATE TABLE IF NOT EXISTS prayer_subscriptions (
 			jid TEXT PRIMARY KEY,
 			city_id TEXT NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)
 	`
 
-	// Earthquake subscriptions table
 	earthquakeTable := `
 		CREATE TABLE IF NOT EXISTS earthquake_subscriptions (
 			jid TEXT PRIMARY KEY,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)
 	`
 
-	if _, err := db.Exec(prayerTable); err != nil {
+	if _, err := db.ExecContext(ctx, prayerTable); err != nil {
 		return fmt.Errorf("failed to create prayer_subscriptions table: %w", err)
 	}
 
-	if _, err := db.Exec(earthquakeTable); err != nil {
+	if _, err := db.ExecContext(ctx, earthquakeTable); err != nil {
 		return fmt.Errorf("failed to create earthquake_subscriptions table: %w", err)
+	}
+
+	if _, err := db.ExecContext(ctx, earthquakeEventsTable); err != nil {
+		return fmt.Errorf("failed to create earthquake_events table: %w", err)
+	}
+
+	if _, err := db.ExecContext(ctx, earthquakeEventsIndex); err != nil {
+		return fmt.Errorf("failed to create earthquake_events index: %w", err)
+	}
+
+	if _, err := db.ExecContext(ctx, proxyPoolTable); err != nil {
+		return fmt.Errorf("failed to create proxy_pool table: %w", err)
+	}
+	if _, err := db.ExecContext(ctx, proxyPoolLastSeenIndex); err != nil {
+		return fmt.Errorf("failed to create proxy_pool index: %w", err)
 	}
 
 	return nil
 }
 
 // GetPrayerSubscription retrieves a user's prayer subscription
-func (s *SQLiteSubscriptionStore) GetPrayerSubscription(ctx context.Context, jid string) (string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+func (s *PostgresSubscriptionStore) GetPrayerSubscription(ctx context.Context, jid string) (string, error) {
 	var cityID string
 	err := s.db.QueryRowContext(ctx, `
-		SELECT city_id FROM prayer_subscriptions WHERE jid = ?
+		SELECT city_id FROM prayer_subscriptions WHERE jid = $1
 	`, jid).Scan(&cityID)
 
 	if err == sql.ErrNoRows {
@@ -127,11 +110,12 @@ func (s *SQLiteSubscriptionStore) GetPrayerSubscription(ctx context.Context, jid
 }
 
 // SetPrayerSubscription saves or updates a user's prayer subscription
-func (s *SQLiteSubscriptionStore) SetPrayerSubscription(ctx context.Context, jid, cityID string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	_, err := s.prayerStmt.ExecContext(ctx, jid, cityID)
+func (s *PostgresSubscriptionStore) SetPrayerSubscription(ctx context.Context, jid, cityID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO prayer_subscriptions (jid, city_id, updated_at)
+		VALUES ($1, $2, now())
+		ON CONFLICT (jid) DO UPDATE SET city_id = EXCLUDED.city_id, updated_at = now()
+	`, jid, cityID)
 	if err != nil {
 		return fmt.Errorf("failed to set prayer subscription: %w", err)
 	}
@@ -140,12 +124,9 @@ func (s *SQLiteSubscriptionStore) SetPrayerSubscription(ctx context.Context, jid
 }
 
 // DeletePrayerSubscription removes a user's prayer subscription
-func (s *SQLiteSubscriptionStore) DeletePrayerSubscription(ctx context.Context, jid string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+func (s *PostgresSubscriptionStore) DeletePrayerSubscription(ctx context.Context, jid string) error {
 	_, err := s.db.ExecContext(ctx, `
-		DELETE FROM prayer_subscriptions WHERE jid = ?
+		DELETE FROM prayer_subscriptions WHERE jid = $1
 	`, jid)
 	if err != nil {
 		return fmt.Errorf("failed to delete prayer subscription: %w", err)
@@ -155,10 +136,7 @@ func (s *SQLiteSubscriptionStore) DeletePrayerSubscription(ctx context.Context, 
 }
 
 // ListPrayerSubscriptions returns all prayer subscriptions
-func (s *SQLiteSubscriptionStore) ListPrayerSubscriptions(ctx context.Context) (map[string]string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+func (s *PostgresSubscriptionStore) ListPrayerSubscriptions(ctx context.Context) (map[string]string, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT jid, city_id FROM prayer_subscriptions
 	`)
@@ -184,13 +162,10 @@ func (s *SQLiteSubscriptionStore) ListPrayerSubscriptions(ctx context.Context) (
 }
 
 // IsEarthquakeSubscribed checks if a user is subscribed to earthquake notifications
-func (s *SQLiteSubscriptionStore) IsEarthquakeSubscribed(ctx context.Context, jid string) (bool, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+func (s *PostgresSubscriptionStore) IsEarthquakeSubscribed(ctx context.Context, jid string) (bool, error) {
 	var exists bool
 	err := s.db.QueryRowContext(ctx, `
-		SELECT EXISTS(SELECT 1 FROM earthquake_subscriptions WHERE jid = ?)
+		SELECT EXISTS(SELECT 1 FROM earthquake_subscriptions WHERE jid = $1)
 	`, jid).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("failed to check earthquake subscription: %w", err)
@@ -200,18 +175,19 @@ func (s *SQLiteSubscriptionStore) IsEarthquakeSubscribed(ctx context.Context, ji
 }
 
 // SetEarthquakeSubscription saves or updates a user's earthquake subscription
-func (s *SQLiteSubscriptionStore) SetEarthquakeSubscription(ctx context.Context, jid string, subscribed bool) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+func (s *PostgresSubscriptionStore) SetEarthquakeSubscription(ctx context.Context, jid string, subscribed bool) error {
 	if subscribed {
-		_, err := s.earthquakeStmt.ExecContext(ctx, jid)
+		_, err := s.db.ExecContext(ctx, `
+			INSERT INTO earthquake_subscriptions (jid, updated_at)
+			VALUES ($1, now())
+			ON CONFLICT (jid) DO UPDATE SET updated_at = now()
+		`, jid)
 		if err != nil {
 			return fmt.Errorf("failed to set earthquake subscription: %w", err)
 		}
 	} else {
 		_, err := s.db.ExecContext(ctx, `
-			DELETE FROM earthquake_subscriptions WHERE jid = ?
+			DELETE FROM earthquake_subscriptions WHERE jid = $1
 		`, jid)
 		if err != nil {
 			return fmt.Errorf("failed to unset earthquake subscription: %w", err)
@@ -222,10 +198,7 @@ func (s *SQLiteSubscriptionStore) SetEarthquakeSubscription(ctx context.Context,
 }
 
 // ListEarthquakeSubscriptions returns all earthquake subscribers
-func (s *SQLiteSubscriptionStore) ListEarthquakeSubscriptions(ctx context.Context) ([]string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+func (s *PostgresSubscriptionStore) ListEarthquakeSubscriptions(ctx context.Context) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT jid FROM earthquake_subscriptions
 	`)
@@ -251,20 +224,7 @@ func (s *SQLiteSubscriptionStore) ListEarthquakeSubscriptions(ctx context.Contex
 }
 
 // Close closes the database connection
-func (s *SQLiteSubscriptionStore) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.prayerStmt != nil {
-		if err := s.prayerStmt.Close(); err != nil {
-			return fmt.Errorf("failed to close prayer statement: %w", err)
-		}
-	}
-	if s.earthquakeStmt != nil {
-		if err := s.earthquakeStmt.Close(); err != nil {
-			return fmt.Errorf("failed to close earthquake statement: %w", err)
-		}
-	}
+func (s *PostgresSubscriptionStore) Close() error {
 	if s.db != nil {
 		if err := s.db.Close(); err != nil {
 			return fmt.Errorf("failed to close database: %w", err)

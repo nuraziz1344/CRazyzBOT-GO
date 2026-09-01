@@ -1,13 +1,20 @@
+# local config
 .vscode
-.git
+.claude
 
+# local artifact
+vendor
 *_test.go
-*.json
-*.txt
 
-data/*.db
+# local environment
+docker-compose.yml
 .env
 
-vendor
+# binary output
+/bot
+/proxytest
 
-docker-compose.yml
+# others
+AIO-Downloader
+ffmpeg.txt
+

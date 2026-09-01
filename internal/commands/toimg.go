@@ -28,7 +28,7 @@ func getSticker(msg *dto.ParsedMsg) (media *whatsmeow.DownloadableMessage) {
 	return nil
 }
 
-func HandleToImg(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.SubscriptionStore) {
+func HandleToImg(ctx context.Context, c *whatsmeow.Client, msg *dto.ParsedMsg, args string, store storage.Store) {
 	logutil.Info(ctx, "ToImg command", "from", msg.From.String())
 	sticker := getSticker(msg)
 	if sticker == nil {
